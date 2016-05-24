@@ -30,12 +30,12 @@ public class MainActivity extends AppCompatActivity {
     EditText busStop;
     TextView responseView;
     ProgressBar progressBar;
-    //static final String API_KEY = "USE_YOUR_OWN_API_KEY"; // NEED TO WORK THIS OUT
-    static final String API_URL = "https://api.tfl.gov.uk/Line/155/Arrivals?";
+    Button queryButton;
+    static final String API_URL = "https://api.tfl.gov.uk/Line/155/Arrivals?"; //add private here
     static final String API_ID = "";
     static final String API_KEY = "";
-    //https://api.tfl.gov.uk/Line/155/Arrivals?stopPointId=490006134S&app_id=&app_key=
-
+    private static final String TIME_TO_ARRIVAL = "timeToStation";
+    private static final String DESTINATION = "destinationName";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,6 +47,7 @@ public class MainActivity extends AppCompatActivity {
         busStop = (EditText) findViewById(R.id.busStop);
         responseView = (TextView) findViewById(R.id.responseView);
         progressBar = (ProgressBar) findViewById(R.id.progressBar);
+        queryButton = (Button) findViewById(R.id.queryButton);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -55,13 +56,13 @@ public class MainActivity extends AppCompatActivity {
                 Snackbar.make(view, "Replace with your own action", Snackbar.LENGTH_LONG)
                         .setAction("Action", null).show();
             }
-        });
+        }); // Snackbar - provides lightweight feedback about an operation (popup message)
 
-        Button queryButton = (Button) findViewById(R.id.queryButton);
         queryButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                new RetrieveFeedTask().execute();
+                String stop = busStop.getText().toString();
+                new RetrieveFeedTask().execute(stop);
             }
         });
 
@@ -91,17 +92,35 @@ public class MainActivity extends AppCompatActivity {
     }
     */
 
-    class RetrieveFeedTask extends AsyncTask<Void, Void, String> {
+    // Uses AsyncTask to create a task away from the main UI thread. This task uses
+    // user input text to form a URL/create an HttpUrlConnection. Once the connection
+    // has been established, the AsyncTask downloads the contents of the webpage as
+    // an InputStream. Finally, the InputStream is converted into a string, which is
+    // displayed in the UI by the AsyncTask's onPostExecute method.
+    private class RetrieveFeedTask extends AsyncTask<String, Void, String> {
 
         private Exception exception;
 
         protected void onPreExecute() {
             progressBar.setVisibility(View.VISIBLE);
             responseView.setText("");
+
+            /*
+            //TESTING THAT USER HAS INTERNET CONNECTION:
+            ConnectivityManager connMgr = (ConnectivityManager)
+                getSystemService(Context.CONNECTIVITY_SERVICE);
+            NetworkInfo networkInfo = connMgr.getActiveNetworkInfo();
+            if (networkInfo != null && networkInfo.isConnected()) {
+                // fetch data
+            } else {
+                responseView.setText("No network connection available.");
+            }
+             */
+
         }
 
-        protected String doInBackground(Void... urls) { // WHY ARE THERE 3 DOTS HERE?
-            String stop = busStop.getText().toString();
+        protected String doInBackground(String... stops) { //3 dots means any number of parameters (including none)
+            String stop = stops[0];
             // Do some validation here
             try {
                 URL url = new URL(API_URL + "stopPointId=" + stop + "&app_id=" + API_ID + "&app_key=" + API_KEY);
@@ -131,19 +150,21 @@ public class MainActivity extends AppCompatActivity {
             progressBar.setVisibility(View.GONE);
             Log.i("INFO", response); // API for sending log output
 
-            /*
-            String time = "";
+            String data = "";
             try {
-                JSONObject object = (JSONObject) new JSONTokener(response).nextValue();
-                time = object.getString("expectedArrival");
-                //JSONArray locations = object.getJSONArray("locations");
+                JSONArray returnedData = new JSONArray(response);
+                for(int i = 0; i < returnedData.length(); i++) {
+                    JSONObject next = returnedData.getJSONObject(i);
+                    String dest = next.getString(DESTINATION);
+                    int time = Integer.parseInt(next.getString(TIME_TO_ARRIVAL));
+                    data += dest + "  " + time/60 + " mins\n";
+                }
             } catch (JSONException e) {
                 Log.e("ERROR", e.getMessage(), e);
             }
-            */
 
-            //responseView.setText(time);
-            responseView.setText(response);
+            responseView.setText(data);
+
         }
     }
 
