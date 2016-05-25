@@ -123,7 +123,8 @@ public class MainActivity extends AppCompatActivity {
             String stop = stops[0];
             // Do some validation here
             try {
-                URL url = new URL(API_URL + "stopPointId=" + stop + "&app_id=" + API_ID + "&app_key=" + API_KEY);
+                //URL url = new URL(API_URL + "stopPointId=" + stop + "&app_id=" + API_ID + "&app_key=" + API_KEY);
+                URL url = new URL("http://countdown.api.tfl.gov.uk/interfaces/ura/stream?Stopid=99&ReturnList=DestinationName,EstimatedTime");
                 HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
                 try {
                     BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
