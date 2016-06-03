@@ -1,8 +1,10 @@
 #!/bin/sh
 
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ps aux | grep '[s]erver_script.php'
 if [ $? -ne 0 ]
 then
-    php /homes/amf15/individual_project/php/server_script/server_script.php
-    >&2 echo "Server had to be restarted"
+   echo "email sent from cron" | mailx -s  "Server had to be restarted" amf15@imperial.ac.uk
+   php /data/individual_project/php/server_script/server_script.php >/dev/null 2>&1 & 
 fi
+exit 0

@@ -3,10 +3,10 @@
 // SET UP DATABASE CONNECTION /////////////////////////////////////////
 
 // Database access information:
-$server_ip = ""; // redacted
+$server_ip = "";
 $database_name = "bus_data";
-$username = ""; // redacted
-$password = ""; // redacted
+$username = "";
+$password = "";
 
 // Create database connection:
 $db_connection = pg_connect("host=$server_ip dbname=$database_name 
@@ -95,11 +95,11 @@ function modify_string(&$str) {
 $curl = curl_init(); 
 
 // Set cURL options:
-curl_setopt($curl, CURLOPT_URL, "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?LineID=133,3&ReturnList=Stoppointname,StopID,VisitNumber,LineID,DestinationText,VehicleID,TripID,RegistrationNumber,EstimatedTime,ExpireTime");
+curl_setopt($curl, CURLOPT_URL, "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?LineID=133,3,N133,N3&ReturnList=Stoppointname,StopID,VisitNumber,LineID,DestinationText,VehicleID,TripID,RegistrationNumber,EstimatedTime,ExpireTime");
 
 curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST); // Digest authorisation
 
-curl_setopt($curl, CURLOPT_USERPWD, ""); // User details - redacted
+curl_setopt($curl, CURLOPT_USERPWD, ""); // User details
 
 curl_setopt($curl, CURLOPT_FILE, $fp); // file pointer for output data
 
