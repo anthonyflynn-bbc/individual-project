@@ -3,23 +3,17 @@
 // SET UP DATABASE CONNECTION /////////////////////////////////////////
 
 // Database access information:
-$database_type = 'pgsql';
 $server_ip = "";
 $database_name = "bus_data";
 $username = "";
 $password = "";
 
-
 // Create database connection:
-try {
-  $DBH = new PDO("$database_type:host=$server_ip;dbname=$database_name",$username,$password);
-}
-catch(PDOException $e) {
-  echo $e->getMessage();
-  echo "\n";
-  exit(1);
-}
-echo "Database connection successful";
+$db_connection = pg_connect("host=$server_ip dbname=$database_name 
+	      		  user=$username password=$password")
+  or die("Database connection error");
+echo "Database connection successful.";
+
 
 
 // SET UP STREAM WRAPPER //////////////////////////////////////////////
@@ -33,8 +27,7 @@ class tflStreamWrapper {
  
   function stream_write($data) { // caled when data written by cURL
     $stop_data = explode("\n", $data); //creates array of stop data from stream
-    $current_time = time();
-    
+
     // $buff contains the incomplete last line of data that was present when
     // the last batch of data was written to the database (or nothing if there
     // were no incomplete lines).  This is therefore prefixed to the first item
@@ -47,8 +40,6 @@ class tflStreamWrapper {
     $this->buff = $stop_data[$stop_data_count - 1];
     unset($stop_data[$stop_data_count - 1]); //delete last item in $stop_data
 
-    $insert = "INSERT INTO development (stoppointname,stopid,visitnumber,lineid,destinationtext,vehicleid,tripid,registrationnumber,estimatedtime,expiretime,recordtime) ";
-
     // For each stop_data item in turn:
     for ($i=0; $i < count($stop_data); $i++) {
       //remove characters from front and back ('[',']' and newline character)
@@ -60,7 +51,8 @@ class tflStreamWrapper {
       // those lines which have an expiry of 0 (when bus arrives)
       
       if(count($entry) == 11 && $entry[0] == 1) {
-          //modify strings to make compliant for database insertion
+          // replace double quotes with single quotes for string, and use 
+	  // pg_escape_string to escape any single quotes in data
 	  modify_string($entry[1]);     	  
 	  modify_string($entry[2]);
 	  modify_string($entry[4]);
@@ -68,19 +60,17 @@ class tflStreamWrapper {
 	  modify_string($entry[6]);
 	  modify_string($entry[8]);
 
-	  // Set up string to insert values
-          $sql = $insert."values ($entry[1],$entry[2],$entry[3],$entry[4],$entry[5],$entry[6],$entry[7],$entry[8],$entry[9]/1000,$entry[10]/1000,$current_time)";
-
-	  try {
- 	    $STH = $GLOBALS['DBH']->prepare($sql); // Prepares an SQL statement and returns a statement object
-	    $STH->execute(); // executes the prepared statement
-	  }
-	  catch(PDOException $e) {
-	    echo $e -> getMessage();
-	    echo "\n";
-	  }
+	  // Insert new values into the database
+	  pg_query($GLOBALS['db_connection'], "INSERT INTO stop_data
+	          (stoppointname,stopid,visitnumber,lineid,destinationtext,
+		  vehicleid,tripid,registrationnumber,estimatedtime,expiretime)
+	   VALUES($entry[1],$entry[2],$entry[3],$entry[4],
+		  $entry[5],$entry[6],$entry[7],$entry[8],
+		  $entry[9],$entry[10]);")
+ 	  or die("Error writing to database");
       }
     }
+
     return strlen($data);
   }
 }
@@ -93,10 +83,9 @@ stream_wrapper_register("tflStreamWrapper","tflStreamWrapper")
 $fp = fopen("tflStreamWrapper://tflStream","r+")
   or die("Error opening wrapper file handler");
 
-// Replace double quotes with single quotes, and escape any single quotes within string
 function modify_string(&$str) {
   $str = substr($str, 1, -1);
-  $str = $GLOBALS['DBH']->quote($str);
+  $str = "'".pg_escape_string($str)."'";
 }
 
 
