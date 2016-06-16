@@ -12,7 +12,8 @@ $password = "";
 
 // Create database connection:
 try {
-  $DBH = new PDO("$database_type:host=$server_ip;dbname=$database_name",$username,$password);
+  $DBH = new PDO("$database_type:host=$server_ip;dbname=$database_name",
+		  $username,$password);
 }
 catch(PDOException $e) {
   echo $e->getMessage();
@@ -25,23 +26,26 @@ echo "Database connection successful";
 // SET UP STREAM WRAPPER //////////////////////////////////////////////
 
 class tflStreamWrapper {
-  protected $buff; // buffer to store any partial lines during parsing
-  protected $uniqueid_array; // associative array to hold uniqueids for current day and previous day (indexed by tripid+registrationnumber)
+  protected $buff; // buffer to store partial lines during parsing
+  protected $uniqueid_array; //uniqueid array (index: tripid+registrationnumber)
   protected $journey_daycount; // number of unique journeys for current day
-  protected $array_date;
+  protected $array_date; //array contains data for $array_date + 1 day before
 
+  // function called immediately after wrapper initialised
   function stream_open($path, $mode, $options, &$opened_path) {
-    $this->array_date = date('Ymd',strval(time())); // uniqueid_array holds uniqueids for this date and the day before
+    $this->array_date = date('Ymd',strval(time())); // set to current date
     $this->journey_daycount = 1;
-    $this->load_uniqueid_array_data();
+    $this->load_uniqueid_array();
     return true;
-  } // called immediately after wrapper initialised
- 
-  function stream_write($data) { // caled when data written by cURL
+  }
+
+
+  // function called whenever a write operation is called by cURL
+  function stream_write($data) { 
     $stop_data = explode("\n", $data); //creates array of stop data from stream
     $current_time = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',time()));
 
-    $this->check_uniqueid_array();
+    $this->check_uniqueid_array(); // checks if the uniqueid array is up to date
     
     // $buff contains the incomplete last line of data that was present when
     // the last batch of data was written to the database (or nothing if there
@@ -50,16 +54,17 @@ class tflStreamWrapper {
     $stop_data[0] = $this->buff.$stop_data[0];
  
     // Save the last line of this batch of data to the buffer (in case it is
-    // incomplete.  Will be prefixed to first item in next batch
+    // incomplete).  Will be prefixed to first item in next batch
     $stop_data_count = count($stop_data);
     $this->buff = $stop_data[$stop_data_count - 1];
     unset($stop_data[$stop_data_count - 1]); //delete last item in $stop_data
 
-    $insert_stop_prediction = "INSERT INTO stop_prediction (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) ";
+    // Prepare generic SQL statement to insert into stop_prediction:
+    $insert_stop_prediction = "INSERT INTO stop_prediction (stopid,visitnumber,"
+    			     ."destinationtext,vehicleid,estimatedtime,"
+			     ."expiretime,recordtime,uniqueid) ";
 
-    $insert_journey_identifier = "INSERT INTO journey_identifier (uniqueid,tripid,registrationnumber,linename) ";
-
-    // For each stop_data item in turn:
+    // For each stop prediction item in turn:
     for ($i=0; $i < count($stop_data); $i++) {
       //remove characters from front and back ('[',']' and newline character)
       $trimmed = trim($stop_data[$i], "[]\n\r"); 
@@ -69,43 +74,30 @@ class tflStreamWrapper {
       // exclude the URA Version array (starts with a '4')
       if(count($entry) == 10 && $entry[0] == 1) {
           //modify strings to make compliant for database insertion
-	  modify_string($entry[1]); // StopID
-	  modify_string($entry[3]); // LineName
-	  modify_string($entry[4]); // DestinationText
-	  modify_string($entry[5]); // VehicleID
-	  modify_string($entry[7]); // RegistrationNumber
+	  $this->modify_string($entry[1]); // StopID
+	  $this->modify_string($entry[3]); // LineName
+	  $this->modify_string($entry[4]); // DestinationText
+	  $this->modify_string($entry[5]); // VehicleID
+	  $this->modify_string($entry[7]); // RegistrationNumber
 	  $entry[8] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[8]/1000));
 	  $entry[9] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[9]/1000));
 
-	  $this_tripid_reg = strval($entry[6]).$entry[7];
-	  $this_uniqueid;
-	  if(!array_key_exists($this_tripid_reg,$this->uniqueid_array)) {
-	    $this_uniqueid = $this->array_date.str_pad($this->journey_daycount,6,"0",STR_PAD_LEFT); // str_pad returns the input string padded up to 6 characters by adding "0" to the left 
-	    $this->uniqueid_array[$this_tripid_reg] = $this_uniqueid;
-	    $this->journey_daycount++;
+	  $entry_tripid_reg = strval($entry[6]).$entry[7]; // array key
+	  $entry_uniqueid;
 
-	    $journey_identifier_sql = $insert_journey_identifier."values ($this_uniqueid,$entry[6],$entry[7],$entry[3])";
-	    
-	    try {
- 	      $STH_JOURNEY = $GLOBALS['DBH']->prepare($journey_identifier_sql);
-	      $STH_JOURNEY->execute();
-	    }
-	    catch(PDOException $e) {
-	      echo $e -> getMessage();
-	      echo "\n";
-	    }
-	  } else {
-	    $this_uniqueid = $this->uniqueid_array[$this_tripid_reg];
-	  }
+	  $this->get_uniqueid($entry_tripid_reg, $entry_uniqueid,$entry[6],
+	  	       $entry[7],$entry[3]); //get (or generate) uniqueid
 
-	  // Set up string to insert values
-          $sql = $insert_stop_prediction."values ($entry[1],$entry[2],$entry[4],$entry[5],$entry[8],$entry[9],$current_time,$this_uniqueid)";
+	  // Set up string to insert values into stop prediction database
+          $save_stop_prediction = $insert_stop_prediction."values ($entry[1],"
+	  			  	."$entry[2],$entry[4],$entry[5],"
+					."$entry[8],$entry[9],$current_time,"
+					."$entry_uniqueid)";
 	  
-	  //echo $sql."\n";
-
+	  // insert stop prediction into database:
 	  try {
- 	    $STH = $GLOBALS['DBH']->prepare($sql); // Prepares an SQL statement and returns a statement object
-	    $STH->execute(); // executes the prepared statement
+ 	    $statement_obj = $GLOBALS['DBH']->prepare($save_stop_prediction);
+	    $statement_obj->execute();
 	  }
 	  catch(PDOException $e) {
 	    echo $e -> getMessage();
@@ -116,40 +108,96 @@ class tflStreamWrapper {
     return strlen($data);
   }
 
+  // function loads the uniqueid from the associative array (if it already
+  // exists), otherwise it creates a new uniqueid and saves it to the array
+  // and database
+  function get_uniqueid($tripid_reg, &$uniqueid,$tripid,$reg,$linename) {
+    //if tripid_reg doesn't exist as key in uniqueid_array:
+    if(!array_key_exists($tripid_reg,$this->uniqueid_array)) {
+      $uniqueid = $this->array_date.str_pad(
+      		    $this->journey_daycount,6,"0",STR_PAD_LEFT); //pad daycount      
+
+      //add uniqueid to array and increment journey_daycount:
+      $this->uniqueid_array[$tripid_reg] = $uniqueid;
+      $this->journey_daycount++;
+
+      //save uniqueid and associated information to database:
+      $save_uniqueid = "INSERT INTO journey_identifier (uniqueid,"
+    		      ."tripid,registrationnumber,linename) "
+		      ."values ($uniqueid,$tripid,$reg,$linename)";
+	    
+      try {
+        $statement_obj = $GLOBALS['DBH']->prepare($save_uniqueid);
+	$statement_obj->execute();
+      }
+      catch(PDOException $e) {
+        echo $e -> getMessage();
+	echo "\n";
+      }
+    } else { // uniqueid already exists in uniqueid_array
+      $uniqueid = $this->uniqueid_array[$tripid_reg];
+    }
+  }
+
+  // function to check whether the value of $array_date is equal to the
+  // current day.  If not, the $uniqueid_array is reloaded to ensure that it
+  // only ever contains two days of data
   function check_uniqueid_array() {
     $current_date = date('Ymd',time());
     if($current_date != $this->array_date) {
       $this->array_date = $current_date;
       $this->journey_daycount = 1;
-      load_uniqueid_array_data($this->array_date);
+      load_uniqueid_array();
     }
   }
 
-  function load_uniqueid_array_data() {
-    unset($this->uniqueid_array);
-    $this->uniqueid_array = array();
+  // Replace double quotes with single quotes + escape single quotes in string
+  function modify_string(&$str) {
+    $str = substr($str, 1, -1);
+    $str = $GLOBALS['DBH']->quote($str);
+  }
+
+  // function to load all key-value pairs for the current day and one day 
+  // before into $uniqueid_array from the database relation journey_identifier
+  function load_uniqueid_array() {
+    unset($this->uniqueid_array); // delete any values held in $uniqueid_array
+    $this->uniqueid_array = array(); // assign a new empty array
     $previous_date = strval(intval($this->array_date)-1);
 
-    $sql = "SELECT uniqueid, tripid, registrationnumber FROM journey_identifier WHERE uniqueid LIKE '$this->array_date%' UNION SELECT uniqueid, tripid, registrationnumber FROM journey_identifier WHERE uniqueid LIKE '$previous_date%'";
+    // set up SQL statement to load uniqueid data:
+    $load_uniqueid = "SELECT uniqueid, tripid, registrationnumber "
+    	  	    ."FROM journey_identifier "
+          	    ."WHERE uniqueid LIKE '$this->array_date%' "
+	  	    ."UNION "
+	  	    ."SELECT uniqueid, tripid, registrationnumber "
+	  	    ."FROM journey_identifier "
+	  	    ."WHERE uniqueid LIKE '$previous_date%'";
 
     try {
-      $STH = $GLOBALS['DBH']->prepare($sql); // Prepares SQL statement; Return statement object
-      $STH->execute(); // executes the prepared statement
+      $statement_obj = $GLOBALS['DBH']->prepare($load_uniqueid);
+      $statement_obj->execute(); // executes the prepared statement
     }
       catch(PDOException $e) {
-      echo $e -> getMessage();
+      echo $e->getMessage();
       echo "\n";
     }
   
-    $result=$STH->fetchAll(PDO::FETCH_ASSOC);
+    //returns an array indexed by column name:
+    $result = $statement_obj->fetchAll(PDO::FETCH_ASSOC);
  
-    foreach($result as $key => $value) { // Loads relevant values into uniqueid_array
+    // Loads relevant values into uniqueid_array:
+    foreach($result as $key => $value) { 
       $uniqueid = $value['uniqueid'];
       $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
       $this->uniqueid_array[$tripid_reg] = $uniqueid;
+      
+      //Extract the maximum value of journey daycount for current day:      
+      if(substr($tripid_reg,0,7) == $this->array_date 
+         && intval(substr($tripid_reg,8,13)) > $this->journey_daycount) {
+	   $this->journey_daycount = intval(substr($tripid_reg,8,13));
+      }
     }
   }
-
 }
 
 // Register wrapper:
@@ -160,14 +208,6 @@ stream_wrapper_register("tflStreamWrapper","tflStreamWrapper")
 $fp = fopen("tflStreamWrapper://tflStream","r+")
   or die("Error opening wrapper file handler");
 
-// Replace double quotes with single quotes, and escape any single quotes within string
-function modify_string(&$str) {
-  $str = substr($str, 1, -1);
-  $str = $GLOBALS['DBH']->quote($str);
-}
-
-
-
 
 // SET UP cURL SESSION ////////////////////////////////////////////////
 
@@ -175,7 +215,10 @@ function modify_string(&$str) {
 $curl = curl_init(); 
 
 // Set cURL options:
-curl_setopt($curl, CURLOPT_URL, "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?LineID=133,3,N133,N3&ReturnList=StopID,VisitNumber,LineName,DestinationText,VehicleID,TripID,Registrationnumber,EstimatedTime,ExpireTime");
+curl_setopt($curl, CURLOPT_URL, 
+           "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?LineID=133"
+	  .",3,N133,N3&ReturnList=StopID,VisitNumber,LineName,DestinationText,"
+	  ."VehicleID,TripID,Registrationnumber,EstimatedTime,ExpireTime");
 
 curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST); // Digest authorisation
 
@@ -184,7 +227,6 @@ curl_setopt($curl, CURLOPT_USERPWD, ":"); // User details
 curl_setopt($curl, CURLOPT_FILE, $fp); // file pointer for output data
 
 curl_setopt($curl, CURLOPT_TIMEOUT, 99999999); // Long-lived connection
-
 
 // Start the cURL session (begin collecting data):
 curl_exec($curl);
