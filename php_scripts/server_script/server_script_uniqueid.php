@@ -16,8 +16,7 @@ try {
 		  $username,$password);
 }
 catch(PDOException $e) {
-  echo $e->getMessage();
-  echo "\n";
+  echo $e->getMessage()."\n";
   exit(1);
 }
 echo "Database connection successful";
@@ -39,13 +38,12 @@ class tflStreamWrapper {
     return true;
   }
 
-
   // function called whenever a write operation is called by cURL
   function stream_write($data) { 
     $stop_data = explode("\n", $data); //creates array of stop data from stream
     $current_time = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',time()));
 
-    $this->check_uniqueid_array(); // checks if the uniqueid array is up to date
+    $this->check_uniqueid_array(date('Ymd',time())); // checks if the uniqueid array is up to date
     
     // $buff contains the incomplete last line of data that was present when
     // the last batch of data was written to the database (or nothing if there
@@ -82,7 +80,7 @@ class tflStreamWrapper {
 	  $entry[8] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[8]/1000));
 	  $entry[9] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[9]/1000));
 
-	  $entry_tripid_reg = strval($entry[6]).$entry[7]; // array key
+	  $entry_tripid_reg = strval($entry[6]).substr($entry[7], 1, -1);
 	  $entry_uniqueid;
 
 	  $this->get_uniqueid($entry_tripid_reg, $entry_uniqueid,$entry[6],
@@ -100,8 +98,7 @@ class tflStreamWrapper {
 	    $statement_obj->execute();
 	  }
 	  catch(PDOException $e) {
-	    echo $e -> getMessage();
-	    echo "\n";
+	    echo $e->getMessage()."\n";
 	  }
       }
     }
@@ -131,8 +128,7 @@ class tflStreamWrapper {
 	$statement_obj->execute();
       }
       catch(PDOException $e) {
-        echo $e -> getMessage();
-	echo "\n";
+        echo $e->getMessage()."\n";
       }
     } else { // uniqueid already exists in uniqueid_array
       $uniqueid = $this->uniqueid_array[$tripid_reg];
@@ -142,8 +138,7 @@ class tflStreamWrapper {
   // function to check whether the value of $array_date is equal to the
   // current day.  If not, the $uniqueid_array is reloaded to ensure that it
   // only ever contains two days of data
-  function check_uniqueid_array() {
-    $current_date = date('Ymd',time());
+  function check_uniqueid_array($current_date) {
     if($current_date != $this->array_date) {
       $this->array_date = $current_date;
       $this->journey_daycount = 1;
@@ -157,6 +152,13 @@ class tflStreamWrapper {
     $str = $GLOBALS['DBH']->quote($str);
   }
 
+  // function to prepare sql statement to load uniqueids from database
+  function load_uniqueid_sql($date_string) {
+    return "SELECT uniqueid, tripid, registrationnumber "
+    	  ."FROM journey_identifier "
+          ."WHERE uniqueid LIKE '$date_string%' ";
+  }
+
   // function to load all key-value pairs for the current day and one day 
   // before into $uniqueid_array from the database relation journey_identifier
   function load_uniqueid_array() {
@@ -164,37 +166,39 @@ class tflStreamWrapper {
     $this->uniqueid_array = array(); // assign a new empty array
     $previous_date = strval(intval($this->array_date)-1);
 
-    // set up SQL statement to load uniqueid data:
-    $load_uniqueid = "SELECT uniqueid, tripid, registrationnumber "
-    	  	    ."FROM journey_identifier "
-          	    ."WHERE uniqueid LIKE '$this->array_date%' "
-	  	    ."UNION "
-	  	    ."SELECT uniqueid, tripid, registrationnumber "
-	  	    ."FROM journey_identifier "
-	  	    ."WHERE uniqueid LIKE '$previous_date%'";
+    // set up SQL statements to load uniqueid data:
+    $previous_day_sql = $this->load_uniqueid_sql($previous_date);
+    $current_day_sql = $this->load_uniqueid_sql($this->array_date);
 
     try {
-      $statement_obj = $GLOBALS['DBH']->prepare($load_uniqueid);
-      $statement_obj->execute(); // executes the prepared statement
+      $previous_day_obj = $GLOBALS['DBH']->prepare($previous_day_sql);
+      $previous_day_obj->execute(); // executes the prepared statement;
+      $current_day_obj = $GLOBALS['DBH']->prepare($current_day_sql);
+      $current_day_obj->execute(); // executes the prepared statement;
     }
-      catch(PDOException $e) {
-      echo $e->getMessage();
-      echo "\n";
+    catch(PDOException $e) {
+      echo $e->getMessage()."\n";
     }
   
-    //returns an array indexed by column name:
-    $result = $statement_obj->fetchAll(PDO::FETCH_ASSOC);
- 
-    // Loads relevant values into uniqueid_array:
-    foreach($result as $key => $value) { 
+    // returns an array indexed by column name:
+    $previous_day_result = $previous_day_obj->fetchAll(PDO::FETCH_ASSOC);
+
+    // save values into uniqueid array
+    foreach($previous_day_result as $key => $value) { 
       $uniqueid = $value['uniqueid'];
       $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
       $this->uniqueid_array[$tripid_reg] = $uniqueid;
-      
-      //Extract the maximum value of journey daycount for current day:      
-      if(substr($tripid_reg,0,7) == $this->array_date 
-         && intval(substr($tripid_reg,8,13)) > $this->journey_daycount) {
-	   $this->journey_daycount = intval(substr($tripid_reg,8,13));
+    }
+
+    // fetch and save current day results into uniqueid array
+    $current_day_result = $current_day_obj->fetchAll(PDO::FETCH_ASSOC);
+
+    if($current_day_result) { // false if no values returned
+      foreach($current_day_result as $key => $value) { 
+        $uniqueid = $value['uniqueid'];
+        $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
+        $this->uniqueid_array[$tripid_reg] = $uniqueid;
+        $this->journey_daycount++;
       }
     }
   }
@@ -207,6 +211,9 @@ stream_wrapper_register("tflStreamWrapper","tflStreamWrapper")
 // Open a file handler using the wrapper protocol
 $fp = fopen("tflStreamWrapper://tflStream","r+")
   or die("Error opening wrapper file handler");
+
+
+
 
 
 // SET UP cURL SESSION ////////////////////////////////////////////////
@@ -222,7 +229,7 @@ curl_setopt($curl, CURLOPT_URL,
 
 curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST); // Digest authorisation
 
-curl_setopt($curl, CURLOPT_USERPWD, ":"); // User details
+curl_setopt($curl, CURLOPT_USERPWD, ":y"); // User details
 
 curl_setopt($curl, CURLOPT_FILE, $fp); // file pointer for output data
 
@@ -234,5 +241,6 @@ curl_exec($curl);
 // Close the connection and file handler when finished:
 curl_close($curl);
 fclose($fp);
+
 
 ?>
