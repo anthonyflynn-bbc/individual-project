@@ -4,10 +4,10 @@
 
 // Database access information:
 $database_type = 'pgsql';
-$server_ip = "";
+$server_ip = "146.169.47.42";
 $database_name = "bus_data";
-$username = "";
-$password = "";
+$username = "testuser";
+$password = "testpassword";
 
 
 // Create database connection:
@@ -66,17 +66,19 @@ class tflStreamWrapper {
     for ($i=0; $i < count($stop_data); $i++) {
       //remove characters from front and back ('[',']' and newline character)
       $trimmed = trim($stop_data[$i], "[]\n\r"); 
-      $entry = explode(",", $trimmed); // split data into array
+      
+      $entry = str_getcsv($trimmed); //parses the CSV string into an array
 
       // To be of interest, the line must have 10 pieces of data and should 
-      // exclude the URA Version array (starts with a '4')
+      // exclude the URA Version array (must start with a '1')
       if(count($entry) == 10 && $entry[0] == 1) {
-          //modify strings to make compliant for database insertion
-	  $this->modify_string($entry[1]); // StopID
-	  $this->modify_string($entry[3]); // LineName
-	  $this->modify_string($entry[4]); // DestinationText
-	  $this->modify_string($entry[5]); // VehicleID
-	  $this->modify_string($entry[7]); // RegistrationNumber
+          //place quotes around strings / escape special characters
+
+	  $entry[1] = $GLOBALS['DBH']->quote($entry[1]); // StopID
+	  $entry[3] = $GLOBALS['DBH']->quote($entry[3]); // LineName
+	  $entry[4] = $GLOBALS['DBH']->quote($entry[4]); // DestinationText
+	  $entry[5] = $GLOBALS['DBH']->quote($entry[5]); // VehicleID
+	  $entry[7] = $GLOBALS['DBH']->quote($entry[7]); // RegistrationNumber
 	  $entry[8] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[8]/1000));
 	  $entry[9] = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$entry[9]/1000));
 
@@ -142,16 +144,10 @@ class tflStreamWrapper {
     if($current_date != $this->array_date) {
       $this->array_date = $current_date;
       $this->journey_daycount = 1;
-      load_uniqueid_array();
+      $this->load_uniqueid_array();
     }
   }
-
-  // Replace double quotes with single quotes + escape single quotes in string
-  function modify_string(&$str) {
-    $str = substr($str, 1, -1);
-    $str = $GLOBALS['DBH']->quote($str);
-  }
-
+    
   // function to prepare sql statement to load uniqueids from database
   function load_uniqueid_sql($date_string) {
     return "SELECT uniqueid, tripid, registrationnumber "
@@ -229,7 +225,7 @@ curl_setopt($curl, CURLOPT_URL,
 
 curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST); // Digest authorisation
 
-curl_setopt($curl, CURLOPT_USERPWD, ":y"); // User details
+curl_setopt($curl, CURLOPT_USERPWD, "LiveBus77966:ChUdA6weye"); // User details
 
 curl_setopt($curl, CURLOPT_FILE, $fp); // file pointer for output data
 
