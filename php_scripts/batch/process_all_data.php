@@ -1,27 +1,11 @@
 <?php
 
 // all uniquids with estimatedtimes before $backup_time will be processed
-$backup_time = '2016-06-28 06:00:00'; 
+$backup_time = '2016-06-29 10:00:00'; 
+
 
 // SET UP DATABASE CONNECTION //////////////////////////////////////////////////
-
-// Database access information:
-$database_type = 'pgsql';
-$server_ip = "";
-$database_name = "bus_data";
-$username = "";
-$password = "";
-
-// Create database connection:
-try {
-  $DBH = new PDO("$database_type:host=$server_ip;dbname=$database_name",
-		  $username,$password);
-}
-catch(PDOException $e) {
-  echo $e->getMessage()."\n";
-  exit(1);
-}
-echo "Database connection successful";
+$DBH = connect_to_database();
 
 // PROCESS BATCH JOB ///////////////////////////////////////////////////////////
 $all_uniqueids = get_uniqueids($backup_time);
@@ -40,7 +24,7 @@ function get_uniqueids($backup_time) {
   $uniqueid_sql = 
    	   "SELECT DISTINCT uniqueid "
     	  ."FROM stop_prediction "
-	  ."WHERE estimatedtime < '$backup_time'";
+	  ."WHERE estimatedtime <= '$backup_time'";
 
   // get results of query from database
   $uniqueid_result = execute_sql($uniqueid_sql)->fetchAll(PDO::FETCH_ASSOC);
@@ -66,14 +50,15 @@ function delete_stale_information($journey_uniqueid) {
 // stop predictions for a particular journey uniqueid
 function process_journey($journey_uniqueid) {
   $arrival_times_sql = 
-          "SELECT * "
-    	  ."FROM stop_prediction AS predictions "
-    	  ."WHERE uniqueid = '$journey_uniqueid' "
-    	  ."AND recordtime >= ALL "
-    	  ."(SELECT recordtime "
-    	  ."FROM stop_prediction "
-    	  ."WHERE uniqueid = '$journey_uniqueid' "
-    	  ."AND predictions.stopid = stopid)";
+  	  "SELECT stop_prediction.* "
+	 ."FROM stop_prediction, "
+	   ."(SELECT stopid, MAX(recordtime) AS arrival_time "
+	   ."FROM stop_prediction "
+	   ."WHERE uniqueid='$journey_uniqueid' "
+	   ."GROUP BY stopid) arrivals "
+	 ."WHERE stop_prediction.stopid = arrivals.stopid "
+	 ."AND stop_prediction.recordtime = arrivals.arrival_time "
+	 ."AND stop_prediction.uniqueid='$journey_uniqueid'";
 
   $journey_arrival_array = execute_sql($arrival_times_sql)
 				->fetchAll(PDO::FETCH_ASSOC);;
@@ -90,7 +75,7 @@ function journey_database_insert($stop_arrival) {
          "INSERT INTO batch_journey (stopid,visitnumber,"
     	."destinationtext,vehicleid,estimatedtime,"
         ."expiretime,recordtime,uniqueid) "
-	."values ("
+	."VALUES ("
 	.$GLOBALS['DBH']->quote($stop_arrival['stopid']).","
 	.$stop_arrival['visitnumber'].","
 	.$GLOBALS['DBH']->quote($stop_arrival['destinationtext']).","
@@ -102,6 +87,28 @@ function journey_database_insert($stop_arrival) {
 
   execute_sql($insert_stop_prediction);
 }
+
+// Function forms a connection to the bus_data database
+function connect_to_database() {
+  // Database access information:
+  $database_type = 'pgsql';
+  $server_ip = "";
+  $database_name = "bus_data";
+  $username = "";
+  $password = "";
+
+  // Create database connection:
+  try {
+    $DBH = new PDO("$database_type:host=$server_ip;dbname=$database_name",
+    	      $username,$password);
+  }
+  catch(PDOException $e) {
+    echo $e->getMessage()."\n";
+    exit(1);
+  }
+  return $DBH;
+}
+
 
 // Function executes an sql statement & returns an array containing the response
 function execute_sql($sql_statement) {
