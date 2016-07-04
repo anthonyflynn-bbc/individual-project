@@ -1,27 +1,71 @@
 <?php
 
-// SET UP STREAM WRAPPER //////////////////////////////////////////////
+// SET UP STREAM WRAPPER ///////////////////////////////////////////////////////
 
 class tflStreamWrapper {
   protected $buff; // buffer to store partial lines during parsing
   protected $uniqueid_array; //uniqueid array (index: tripid+registrationnumber)
   protected $journey_daycount; // number of unique journeys for current day
-  protected $array_date; //array contains data for $array_date + 1 day before
+  protected $uniqueid_array_update_time; //last update time of uniqueid_array
 
   // function called immediately after wrapper initialised
   function stream_open($path, $mode, $options, &$opened_path) {
-    $this->array_date = date('Ymd',strval(time())); // set to current date
+    $this->uniqueid_array_update_time = time(); // set to current time
     $this->journey_daycount = 1;
     $this->load_uniqueid_array();
     return true;
   }
 
+  // function to load all key-value pairs for the current day + last 4 hours of 
+  // previous day into $uniqueid_array from database table journey_identifier
+  function load_uniqueid_array() {
+    unset($this->uniqueid_array); // delete any values held in $uniqueid_array
+    $this->uniqueid_array = array(); // assign a new empty array
+    $current_date = date('Ymd', strval($this->uniqueid_array_update_time));
+
+    // set up SQL statements to load uniqueid data:
+    $uniqueid_sql = $this->load_uniqueid_sql();
+
+    // Execute SQL and fetch results into an array indexed by column name:
+    $uniqueid_result = $this->execute_sql($uniqueid_sql)
+			    ->fetchAll(PDO::FETCH_ASSOC);
+
+    // save values into uniqueid array
+    if($uniqueid_result) { // false if no values returned
+      foreach($uniqueid_result as $key => $value) { 
+        $uniqueid = $value['uniqueid'];
+        $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
+        $this->uniqueid_array[$tripid_reg] = $uniqueid;
+        if(substr($uniqueid,0,8) == $current_date) {
+          $this->journey_daycount++;
+        }
+      }
+    }
+  }
+
+  // function to prepare sql statement to load uniqueids from database
+  function load_uniqueid_sql() {
+    $previous_day_time = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',
+         strtotime('yesterday', $this->uniqueid_array_update_time)+20*3600));
+
+    return "SELECT uniqueid, tripid, registrationnumber "
+    	  ."FROM journey_identifier "
+          ."WHERE EXISTS "
+	  ."(SELECT estimatedtime "
+	  ."FROM stop_prediction "
+	  ."WHERE journey_identifier.uniqueid = stop_prediction.uniqueid "
+	  ."AND estimatedtime >= $previous_day_time)";
+}
+
   // function called whenever a write operation is called by cURL
   function stream_write($data) { 
     $stop_data = explode("\n", $data); //creates array of stop data from stream
-    $current_time = $GLOBALS['DBH']->quote(date('Y-m-d H:i:s',time()));
+    $current_unix_time = time();
 
-    $this->check_uniqueid_array(date('Ymd',time())); // checks if the uniqueid array is up to date
+    $current_time = $GLOBALS['DBH']->quote(
+				       date('Y-m-d H:i:s',$current_unix_time));
+
+    $this->check_uniqueid_array($current_unix_time); //check up to date
     
     // $buff contains the incomplete last line of data that was present when
     // the last batch of data was written to the database (or nothing if there
@@ -79,14 +123,27 @@ class tflStreamWrapper {
     return strlen($data);
   }
 
+  // function to check whether the $uniqueid_array contains current
+  // information.  If not, the $uniqueid_array is reloaded
+  function check_uniqueid_array($current_time) {
+    $current_date = date('Ymd',strval($current_time));
+    $array_date = date('Ymd',strval($this->uniqueid_array_update_time));
+    if($current_date != $array_date) {
+      $this->uniqueid_array_update_time = $current_time;
+      $this->journey_daycount = 1;
+      $this->load_uniqueid_array();
+    }
+  }
+
   // function loads the uniqueid from the associative array (if it already
   // exists), otherwise it creates a new uniqueid and saves it to the array
   // and database
   function get_uniqueid($tripid_reg, &$uniqueid,$tripid,$reg,$linename) {
     //if tripid_reg doesn't exist as key in uniqueid_array:
     if(!array_key_exists($tripid_reg,$this->uniqueid_array)) {
-      $uniqueid = $this->array_date.str_pad(
-      		    $this->journey_daycount,6,"0",STR_PAD_LEFT); //pad daycount      
+      $current_date = date('Ymd',strval($this->uniqueid_array_update_time));
+      $uniqueid = $current_date.str_pad(
+      		    $this->journey_daycount,6,"0",STR_PAD_LEFT); //pad daycount
 
       //add uniqueid to array and increment journey_daycount:
       $this->uniqueid_array[$tripid_reg] = $uniqueid;
@@ -101,56 +158,6 @@ class tflStreamWrapper {
 
     } else { // uniqueid already exists in uniqueid_array
       $uniqueid = $this->uniqueid_array[$tripid_reg];
-    }
-  }
-
-  // function to check whether the value of $array_date is equal to the
-  // current day.  If not, the $uniqueid_array is reloaded to ensure that it
-  // only ever contains two days of data
-  function check_uniqueid_array($current_date) {
-    if($current_date != $this->array_date) {
-      $this->array_date = $current_date;
-      $this->journey_daycount = 1;
-      $this->load_uniqueid_array();
-    }
-  }
-    
-  // function to prepare sql statement to load uniqueids from database
-  function load_uniqueid_sql($date_string) {
-    return "SELECT uniqueid, tripid, registrationnumber "
-    	  ."FROM journey_identifier "
-          ."WHERE uniqueid LIKE '$date_string%' ";
-  }
-
-  // function to load all key-value pairs for the current day and one day 
-  // before into $uniqueid_array from the database relation journey_identifier
-  function load_uniqueid_array() {
-    unset($this->uniqueid_array); // delete any values held in $uniqueid_array
-    $this->uniqueid_array = array(); // assign a new empty array
-    $previous_date = strval(intval($this->array_date)-1);
-
-    // set up SQL statements to load uniqueid data:
-    $previous_day_sql = $this->load_uniqueid_sql($previous_date);
-    $current_day_sql = $this->load_uniqueid_sql($this->array_date);
-
-    // Execute SQL and fetch results into an array indexed by column name:
-    $previous_day_result = $this->execute_sql($previous_day_sql)->fetchAll(PDO::FETCH_ASSOC);
-    $current_day_result = $this->execute_sql($current_day_sql)->fetchAll(PDO::FETCH_ASSOC);
-
-    // save values into uniqueid array
-    foreach($previous_day_result as $key => $value) { 
-      $uniqueid = $value['uniqueid'];
-      $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
-      $this->uniqueid_array[$tripid_reg] = $uniqueid;
-    }
-
-    if($current_day_result) { // false if no values returned
-      foreach($current_day_result as $key => $value) { 
-        $uniqueid = $value['uniqueid'];
-        $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
-        $this->uniqueid_array[$tripid_reg] = $uniqueid;
-        $this->journey_daycount++;
-      }
     }
   }
 
