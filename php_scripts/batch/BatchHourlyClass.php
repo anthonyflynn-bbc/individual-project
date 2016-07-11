@@ -5,6 +5,8 @@ include '/data/individual_project/php/modules/DatabaseClass.php';
 class BatchHourly {
   protected $start_time; // start of batch unix time value
   protected $end_time; // end of batch unix time value
+  protected $start_time_text;
+  protected $end_time_text;
   protected $database;
   protected $DBH; // database connection
 
@@ -14,57 +16,37 @@ class BatchHourly {
     $this->DBH = $this->database->get_connection();
     $this->start_time = $start_time;
     $this->end_time = $end_time;
+    $this->start_time_text = $this->DBH->quote(date('Y-m-d H:i:s', $this->start_time));
+    $this->end_time_text = $this->DBH->quote(date('Y-m-d H:i:s', $this->end_time));
   }
 
   // Function calls the necessary functions to complete the batch process 
   function complete_batch() {
-    $relevant_uniqueids = $this->get_relevant_uniqueids();
-    $batch_data = $this->get_stop_arrivals();
-
-    $this->delete_stale_information($relevant_uniqueids, "batch_journey_all");
+    echo "Beginning process"."\n";
+    $batch_data = $this->get_stop_arrivals(); // stop arrival data extracted
+    echo "Arrival data extracted. Beginning batch_journey deletion"."\n";
+    $this->delete_from_table("batch_journey_all"); // delete any old data from batch_journey
+    echo "batch_journey deletion completed.  Beginning new data insertion"."\n";
     $this->insert_stop_arrivals($batch_data); // insert relevant journey stop arrivals
-    $this->clean_stop_prediction();
-  }
-
-  // Function extracts those uniqueids which have an arrival time in the one hour
-  // batch window, which did not have any stop arrivals in the period prior to
-  // the batch window (which would have been processed in the previous batch jobs)
-  function get_relevant_uniqueids() {
-    $start = $this->DBH->quote(date('Y-m-d H:i:s', $this->start_time));
-    $end = $this->DBH->quote(date('Y-m-d H:i:s', $this->end_time));
-
-    $uniqueid_sql = 
-   	   "SELECT DISTINCT uniqueid "
-    	  ."FROM stop_prediction_all "
-          ."WHERE estimatedtime BETWEEN $start AND $end "
-	  ."EXCEPT "
-	  ."SELECT uniqueid "
-	  ."FROM batch_journey_all ";
-
-    // return results of query from database
-    return $this->database->execute_sql($uniqueid_sql)->fetchAll(PDO::FETCH_ASSOC);
+    echo "Data insertion completed.  Deleting old data from stop_prediction"."\n";
+    $this->delete_from_table("stop_prediction_all"); // remove extracted data from stop_prediction
+    echo "Batch process complete ".$this->start_time_text." ".$this->end_time_text."\n";
   }
 
   // Function extracts stop arrival estimates for each stopid for each uniqueid for the period
   // of interest and returns it in an array
   function get_stop_arrivals() {
-    $start = $this->DBH->quote(date('Y-m-d H:i:s', $this->start_time));
-    $end = $this->DBH->quote(date('Y-m-d H:i:s', $this->end_time));
-
     $stop_arrivals_sql = 
    	   "SELECT stop_prediction_all.* "
 	  ."FROM stop_prediction_all, "
-	  ."(SELECT uniqueid "
-	  ."FROM stop_prediction_all "
-	  ."WHERE estimatedtime BETWEEN $start AND $end "
-	  ."EXCEPT "
-	  ."SELECT uniqueid "
-	  ."FROM batch_journey_all) AS relevant, "
 	  ."(SELECT stopid, uniqueid, MAX(recordtime) AS arrival_time "
 	  ."FROM stop_prediction_all "
+	  ."WHERE uniqueid IN "
+	  ."(SELECT uniqueid "
+	  ."FROM stop_prediction_all "
+	  ."WHERE estimatedtime BETWEEN $this->start_time_text AND $this->end_time_text) "
 	  ."GROUP BY stopid, uniqueid) arrivals "
-	  ."WHERE relevant.uniqueid = stop_prediction_all.uniqueid "
-	  ."AND stop_prediction_all.uniqueid = arrivals.uniqueid "
+	  ."WHERE stop_prediction_all.uniqueid = arrivals.uniqueid "
 	  ."AND stop_prediction_all.stopid = arrivals.stopid "
 	  ."AND stop_prediction_all.recordtime = arrivals.arrival_time";
 
@@ -73,28 +55,16 @@ class BatchHourly {
   }
 
   // Function to delete any old arrival information from a table
-  function delete_stale_information($relevant_uniqueids, $table_name) {
+  function delete_from_table($table_name) {
     $delete_sql = "DELETE FROM $table_name "
-    	         ."WHERE uniqueid = :uniqueid";
+    	         ."WHERE uniqueid IN "
+		 ."(SELECT DISTINCT uniqueid "
+		 ."FROM stop_prediction_all "
+		 ."WHERE estimatedtime BETWEEN $this->start_time_text AND $this->end_time_text)";
 
     $delete_uniqueid = $this->DBH->prepare($delete_sql);
-
-    foreach($relevant_uniqueids as $entry) {
-      $delete_uniqueid->bindValue(':uniqueid', $entry['uniqueid'],PDO::PARAM_STR);
-      $delete_uniqueid->execute();
-    }
+    $delete_uniqueid->execute();
   }
-
-  // Function to delete any old arrival information from a table
-  function clean_stop_prediction() {
-    $start = $this->DBH->quote(date('Y-m-d H:i:s', $this->start_time));
-
-    $delete_sql = "DELETE FROM stop_prediction_all "
-    	         ."WHERE estimatedtime < $start";
-
-    $this->database->execute_sql($delete_sql);
-  }
-
 
   // Function inserts the array of new stop arrival data in current batch
   function insert_stop_arrivals($batch_data) {
