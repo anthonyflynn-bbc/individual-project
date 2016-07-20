@@ -18,7 +18,7 @@ class LinkTimeCalculator {
 
   // Function to execute an update of the the link time data
   function complete_update() {
-    echo "Updating link times table...";
+    echo "Updating link times table...\n";
     // Extract the relevant date for which to complete update
     $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
     $backup_date = $this->DBH->quote(date('Y-m-d', $start_time_unix));
@@ -56,7 +56,7 @@ class LinkTimeCalculator {
 
     $this->DBH->beginTransaction();
     $this->database->execute_sql($insert_sql);
-    //$this->database->execute_sql($delete_sql);
+    $this->database->execute_sql($delete_sql);
     $this->DBH->commit();
     echo "Complete\n";
   }
@@ -103,7 +103,6 @@ class LinkTimeCalculator {
       $save_time->bindValue(':link_time', $entry['average_time']);
       $save_time->execute();
     }
-    echo "Complete\n";
   }
 
 }
