@@ -52,8 +52,6 @@ class LinkTimeCalculator {
     $delete_sql = "DELETE FROM batch_journey_all "
 		 ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
 
-    echo $delete_sql."\n";
-
     $this->DBH->beginTransaction();
     $this->database->execute_sql($insert_sql);
     $this->database->execute_sql($delete_sql);
