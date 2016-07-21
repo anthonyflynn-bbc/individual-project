@@ -18,10 +18,10 @@ class LinkTimeCalculator {
 
   // Function to execute an update of the the link time data
   function complete_update() {
-    echo "Updating link times table...\n";
     // Extract the relevant date for which to complete update
     $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
     $backup_date = $this->DBH->quote(date('Y-m-d', $start_time_unix));
+    echo "Updating link times table to insert data for ".$backup_date."...\n";
 
     for($hod = 0; $hod < 24; $hod++) {
       $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_time_unix));
@@ -62,7 +62,7 @@ class LinkTimeCalculator {
   // Function calculates the average journey time between each pair of stops which are
   // adjacent to each other on one or more bus routes
   function extract_journey_times($start_time, $end_time) {
-    echo "Extracting journey times...";
+    echo "Extracting average times between links...";
     $sql = "SELECT source.stopid AS start, destination.stopid AS end, "
     	       ."AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime, source.estimatedtime))) AS average_time "
 	       ."FROM batch_journey_all AS source "
@@ -76,6 +76,7 @@ class LinkTimeCalculator {
 	       ."AND a.directionid = b.directionid "
 	       ."AND (b.stopnumber - a.stopnumber) = 1) as connected_stops "
 	       ."WHERE source.estimatedtime BETWEEN $start_time AND $end_time "
+	       ."AND destination.estimatedtime BETWEEN $start_time AND $end_time "
 	       ."AND x = source.stopid "
 	       ."AND y = destination.stopid "
 	       ."GROUP BY source.stopid, destination.stopid";
