@@ -36,8 +36,8 @@ class tflStreamWrapper {
     if($uniqueid_result) { // false if no values returned
       foreach($uniqueid_result as $key => $value) { 
         $uniqueid = $value['uniqueid'];
-        $tripid_reg = strval($value['tripid']).$value['registrationnumber'];
-        $this->uniqueid_array[$tripid_reg] = $uniqueid;
+        $tripid_reg_directionid = strval($value['tripid']).$value['registrationnumber'].strval($value['directionid']);
+        $this->uniqueid_array[$tripid_reg_directionid] = $uniqueid;
         if(substr($uniqueid,0,8) == $current_date) {
           $this->journey_daycount++;
         }
@@ -50,7 +50,7 @@ class tflStreamWrapper {
     $previous_day_time = $this->DBH->quote(date('Y-m-d H:i:s',
          strtotime('yesterday', $this->uniqueid_array_update_time)+20*3600));
 
-    return "SELECT uniqueid, tripid, registrationnumber "
+    return "SELECT uniqueid, tripid, registrationnumber, directionid "
     	  ."FROM journey_identifier_all "
           ."WHERE EXISTS "
 	  ."(SELECT estimatedtime "
@@ -58,7 +58,7 @@ class tflStreamWrapper {
 	  ."WHERE journey_identifier_all.uniqueid = stop_prediction_all.uniqueid "
 	  ."AND estimatedtime >= $previous_day_time) "
 	  ."UNION "
-	  ."SELECT uniqueid, tripid, registrationnumber "
+	  ."SELECT uniqueid, tripid, registrationnumber, directionid "
     	  ."FROM journey_identifier_all "
           ."WHERE EXISTS "
 	  ."(SELECT estimatedtime "
@@ -151,16 +151,16 @@ class tflStreamWrapper {
   function get_uniqueid($tripid, $registration_number, $linename, 
   	   		$directionid, &$batch_uniqueid_array) {
 
-    $tripid_reg = strval($tripid).$registration_number;
+    $tripid_reg_directionid = strval($tripid).$registration_number.strval($directionid);
 
     //if tripid_reg doesn't exist as key in uniqueid_array:
-    if(!array_key_exists($tripid_reg,$this->uniqueid_array)) {
+    if(!array_key_exists($tripid_reg_directionid,$this->uniqueid_array)) {
       $current_date = date('Ymd',strval($this->uniqueid_array_update_time));
       $uniqueid = $current_date.str_pad(
       		    $this->journey_daycount,6,"0",STR_PAD_LEFT); //pad daycount
 
       //add uniqueid to array and increment journey_daycount:
-      $this->uniqueid_array[$tripid_reg] = $uniqueid;
+      $this->uniqueid_array[$tripid_reg_directionid] = $uniqueid;
       $this->journey_daycount++;
 
       //add details to $batch_uniqueid_array so can be written to database
@@ -173,7 +173,7 @@ class tflStreamWrapper {
       $batch_uniqueid_array[] = $details;
 
     } else { // uniqueid already exists in uniqueid_array
-      $uniqueid = $this->uniqueid_array[$tripid_reg];
+      $uniqueid = $this->uniqueid_array[$tripid_reg_directionid];
     }
     return $uniqueid;
   }
