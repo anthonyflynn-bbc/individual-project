@@ -31,32 +31,8 @@ class LinkTimeCalculator {
       $start_time_unix = $start_time_unix + 60 * 60;
       echo "Update complete for hour ".$hod."\n";
     }
-    $this->make_backup();
+    $this->delete_old_data();
     echo "Link times update complete.\n";
-  }
-
-  // Function moves data which has already been used to calculate link times to a backup
-  // database to ensure database queries remain manageable as data expands
-  function make_backup() {
-    echo "Copying data to backup database...";
-    $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
-    $end_time_unix = $start_time_unix + 24 * 60 * 60;
-    $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_time_unix));
-    $end_time = $this->DBH->quote(date('Y-m-d H:i:s', $end_time_unix));
-
-    $insert_sql = "INSERT INTO batch_journey_backup (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
-                 ."SELECT * "
-		 ."FROM batch_journey_all "
-		 ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
-
-    $delete_sql = "DELETE FROM batch_journey_all "
-		 ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
-
-    $this->DBH->beginTransaction();
-    $this->database->execute_sql($insert_sql);
-    $this->database->execute_sql($delete_sql);
-    $this->DBH->commit();
-    echo "Complete\n";
   }
 
   // Function calculates the average journey time between each pair of stops which are
@@ -104,6 +80,19 @@ class LinkTimeCalculator {
     }
   }
 
+  function delete_old_data() {
+    echo "Deleting processed data...";
+    $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
+    $end_time_unix = $start_time_unix + 24 * 60 * 60;
+    $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_time_unix));
+    $end_time = $this->DBH->quote(date('Y-m-d H:i:s', $end_time_unix));
+
+    $sql = "DELETE FROM batch_journey_all "
+    	  ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
+
+    $this->database->execute_sql($sql);
+    echo "Complete\n";
+  }
 }
 
 

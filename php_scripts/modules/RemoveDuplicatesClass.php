@@ -15,18 +15,29 @@ class RemoveDuplicates {
 
   // Function to remove duplicate arrival predictions where the same uniqueid + stopid + visitnumber
   // is processed by stop_prediction in two batches in the same second
-  function remove_duplicates() {
+  function process_data() {
     $previous_day_unix = strtotime('yesterday',$this->backup_time_unix);
     $relevant_uniqueids = "'".date("Ymd",$previous_day_unix)."%'"; // date for which the duplicates should be removed
 
+    $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
+    $end_time_unix = $start_time_unix + 24 * 60 * 60;
+    $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_time_unix));
+    $end_time = $this->DBH->quote(date('Y-m-d H:i:s', $end_time_unix));
+
     $duplicates = $this->identify_duplicates($relevant_uniqueids);
     $selected_rows = $this->select_best_results($duplicates);
+
+    $this->make_backup($start_time, $end_time); // make a backup of the data before altering
 
     $this->DBH->beginTransaction();
     $this->delete_duplicates($relevant_uniqueids);
     $this->insert_best_results($selected_rows);
     $this->DBH->commit();
     echo "Remove duplicates complete.\n";
+
+    echo "Removing negative linktimes...";
+    $this->delete_negative_linktimes($start_time, $end_time);
+    echo "Removal of negative linktimes complete.\n";
   }
 
   // Function identifies those lines in the batch database which have more than one prediction
@@ -108,6 +119,41 @@ class RemoveDuplicates {
       $insert_rows->bindValue(':uniqueid', $entry['uniqueid'],PDO::PARAM_STR);
       $insert_rows->execute();
     }
+  }
+
+  // Function moves data which has already been used to calculate link times to a backup
+  // database to ensure database queries remain manageable as data expands
+  function make_backup($start_time, $end_time) {
+    echo "Copying data to backup database...";
+
+    $sql = "INSERT INTO batch_journey_backup (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
+          ."SELECT * "
+	  ."FROM batch_journey_all "
+	  ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
+
+    $this->database->execute_sql($sql);
+    echo "Complete\n";
+  }
+
+  // Function deletes negative linktimes from the batch journey database
+  function delete_negative_linktimes($start_time, $end_time) {
+    echo "Deleting negative linktimes...";
+    $sql = "DELETE FROM batch_journey_all "
+    	  ."WHERE (uniqueid, stopid) IN "
+	  ."(SELECT uniqueid, destination.stopid AS end "
+	  ."FROM batch_journey_all AS source JOIN batch_journey_all AS destination USING(uniqueid), "
+	  ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
+	  ."FROM (route_reference NATURAL JOIN stop_reference) AS a JOIN "
+	  ."(route_reference NATURAL JOIN stop_reference) AS b "
+	  ."ON a.linename = b.linename "
+	  ."AND a.directionid = b.directionid "
+	  ."AND (b.stopnumber - a.stopnumber) = 1) as connected_stops "
+	  ."WHERE source.estimatedtime BETWEEN $start_time AND $end_time "
+	  ."AND x = source.stopid "
+	  ."AND y = destination.stopid "
+	  ."AND EXTRACT(EPOCH FROM AGE(destination.estimatedtime, source.estimatedtime)) < 0)";
+
+    $this->database->execute_sql($sql);
   }
 }
 
