@@ -4,6 +4,7 @@ use phpunit\framework\TestCase;
 require_once('/data/individual_project/php/modules/HttpClientClass.php');
 
 class HttpClientTest extends TestCase {
+  // Tests function start_data_collection
   public function test_start_data_collection() {
     $fp = fopen("test.txt","w+");
     $url = "http://countdown.api.tfl.gov.uk/interfaces/ura/instant_V1?"
@@ -25,6 +26,7 @@ class HttpClientTest extends TestCase {
     fclose($fp);
   }
 
+  // Tests input of a non-existent url
   public function test_incorrect_url() {
     $fp = fopen("test.txt","w+");
     $url = "incorrect_url_string";
@@ -34,6 +36,7 @@ class HttpClientTest extends TestCase {
     fclose($fp);
   }    
 
+  // Tests incorrect username
   public function test_incorrect_username() {
     $fp = fopen("test.txt","w+");
     $url = "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?"
@@ -46,6 +49,7 @@ class HttpClientTest extends TestCase {
     $this->assertEquals(null,$character);
   }    
 
+  // Tests incorrect password
   public function test_incorrect_password() {
     $fp = fopen("test.txt","w+");
     $url = "http://countdown.api.tfl.gov.uk/interfaces/ura/stream_V1?"

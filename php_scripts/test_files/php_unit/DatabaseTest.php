@@ -1,9 +1,10 @@
-<?phpy
+<?php
 
 use phpunit\framework\TestCase;
 require_once('/data/individual_project/php/modules/DatabaseClass.php');
 
 class DatabaseTest extends TestCase {
+  // Tests function execute_sql($sql_statement)
   public function test_execute_sql() {
     $db = new Database();
     $sql = "SELECT * FROM phpunittest WHERE recordtime = '2016-07-27 00:00:26'";
@@ -22,6 +23,7 @@ class DatabaseTest extends TestCase {
     $this->assertArrayHasKey('uniqueid', $result[0]);
   }
 
+  // tests function get_connection()
   public function test_get_connection() {
     $db = new Database();
     $DBH = $db->get_connection();
@@ -54,8 +56,8 @@ class DatabaseTest extends TestCase {
    * @expectedException "PDOException"
   */
   public function testTypeException() {
-    $db = new Database("", "", "bus_data", 
-    	      	       "", ""); // no type
+    $db = new Database("", "146.169.47.42", "bus_data", 
+    	      	       "testuser", "testpassword"); // no type
   }
 
   /**
@@ -63,31 +65,31 @@ class DatabaseTest extends TestCase {
   */
   public function testIPException() {
     $db = new Database("pgsql", "", "bus_data", 
-    	      	       "", ""); // no IP
+    	      	       "testuser", "testpassword"); // no IP
   }
 
   /**
    * @expectedException "PDOException"
   */
   public function testNameException() {
-    $db = new Database("pgsql", "", "", 
-    	      	       "", ""); // no database
+    $db = new Database("pgsql", "146.169.47.42", "", 
+    	      	       "testuser", "testpassword"); // no database
   }
 
   /**
    * @expectedException "PDOException"
   */
   public function testUsernameException() {
-    $db = new Database("pgsql", "", "bus_data", 
-    	      	       "", ""); // no username
+    $db = new Database("pgsql", "146.169.47.42", "bus_data", 
+    	      	       "", "testpassword"); // no username
   }
 
   /**
    * @expectedException "PDOException"
   */
   public function testPasswordException() {
-    $db = new Database("pgsql", "", "bus_data", 
-    	      	       "", ""); // no password
+    $db = new Database("pgsql", "146.169.47.42", "bus_data", 
+    	      	       "testuser", ""); // no password
   }
   
 }
