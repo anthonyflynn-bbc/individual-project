@@ -1,5 +1,13 @@
 <?php
 
+// HttpClientClass.php
+// Anthony Miles Flynn
+// (29/07/16)
+// Forms an Http connection to the url ($url) specified in the constructor 
+// parameters and saves the data received to the file pointer ($fp) specified
+// in the constructor parameters.  Uses the default username and password unless
+// alternatives are provided on instantiation.
+
 class HttpClient {
   private $username;
   private $password;
