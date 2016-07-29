@@ -73,17 +73,20 @@ class RouteReference {
     $json_array = $this->download_json($api_url);
 
     $ordered_line_routes = $json_array['orderedLineRoutes'];
-    $ordered_naptanid = $ordered_line_routes[0]['naptanIds']; // ordered stops
 
-    $stop_number = 0;
+    if(count($ordered_line_routes) !== 0) {
+      $ordered_naptanid = $ordered_line_routes[0]['naptanIds']; // ordered stops
 
-    foreach($ordered_naptanid as $stopcode2) {
-      $details = array('linename'=>$linename,
-      	      	       'directionid'=>$directionid,
-		       'stopcode2'=>$stopcode2,
-		       'stopnumber'=>$stop_number);
-      $database_insert_array[] = $details;
-      $stop_number++;
+      $stop_number = 0;
+
+      foreach($ordered_naptanid as $stopcode2) {
+        $details = array('linename'=>$linename,
+      	      	         'directionid'=>$directionid,
+		         'stopcode2'=>$stopcode2,
+		         'stopnumber'=>$stop_number);
+        $database_insert_array[] = $details;
+        $stop_number++;
+      }
     }
   }
 
