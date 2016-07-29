@@ -1,12 +1,11 @@
 <?php
 
 use phpunit\framework\TestCase;
-//require_once('/data/individual_project/php/modules/StopArrivalsClass.php');
-require_once('RouteReferenceClass.php');
+require_once('/data/individual_project/php/modules/RouteReferenceClass.php');
 require_once('RouteReferenceFunctions.php'); // tests of particular funcitons
 
 class RouteReferenceTest extends TestCase {
-  // Tests direction_from_idR
+  // Tests direction_from_id
   public function test_direction_id() {
     $functions = new RouteReferenceFunctions("phpunit_route_reference");
     $this->assertEquals("outbound", $functions->direction_from_id(1));

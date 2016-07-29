@@ -1,27 +1,36 @@
 <?php
 
+// RouteReferenceClass.php
+// Anthony Miles Flynn
+// (29/07/16)
+// Program downloads an ordered sequence of stops for all bus routes in the TfL
+// network, in both directions.  These are saved to the database table provided
+// as a parameter in the constructor method
+
 include '/data/individual_project/php/modules/DatabaseClass.php';
 include '/data/individual_project/php/modules/HttpClientClass.php';
 
 class RouteReference {
-  protected $database;
-  protected $DBH;
+  private $database;
+  private $DBH;
+  private $route_reference_table;
 
   // Constructor
-  function __construct() {
+  public function __construct($route_table="route_reference") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
+    $this->route_reference_table = $route_table;
   }
 
   // Complete update of route_reference table
-  function update_data() {
+  public function update_data() {
     // Get a list of all bus lines:
     $api_url = "https://api.tfl.gov.uk/Line/Mode/bus";
     $json_array = $this->download_json($api_url);
     $linename_array = $this->get_all_linenames($json_array);
 
     // For each bus line (in each direction), extract ordered stop sequence
-    $database_insert_array = array(); // stores info to be inserted into database
+    $database_insert_array = array(); // stores info to insert into database
     $number_linenames = count($linename_array); // total number of bus lines
     $count = 0;
 
@@ -34,9 +43,9 @@ class RouteReference {
       $count++;
       echo "saved to array: ".$linename."\n";
 
-      // save records to database every 5 bus lines (to avoid array getting too big)
+      // save records every 5 bus lines (to avoid array getting too big)
       if($count % 5 == 0 || $count == $number_linenames) {
-        $this->insert_route_reference($database_insert_array); // insert into database
+        $this->insert_route_reference($database_insert_array);
     	$database_insert_array = array();
       }
     }
@@ -44,7 +53,7 @@ class RouteReference {
   }
 
   // Function returns the correct direction in words for a given TfL directionid
-  function direction_from_id($directionid) {
+  private function direction_from_id($directionid) {
     if($directionid == 1) {
       return "outbound";
     } else {
@@ -55,7 +64,7 @@ class RouteReference {
   // Function constructs an appropriate API URL and extracts the ordered stop
   // sequence from the data returned.  This is then added to the database insert
   // array ready for insertion in the database
-  function get_stops($linename, $directionid, &$database_insert_array) {
+  private function get_stops($linename, $directionid, &$database_insert_array) {
     $direction = $this->direction_from_id($directionid);
     $api_url = "https://api.tfl.gov.uk/Line/".$linename."/Route/Sequence/"
   	      .$direction."?serviceTypes=regular,night&app_id=c02bf3c4&"
@@ -64,7 +73,7 @@ class RouteReference {
     $json_array = $this->download_json($api_url);
 
     $ordered_line_routes = $json_array['orderedLineRoutes'];
-    $ordered_naptanid = $ordered_line_routes[0]['naptanIds']; //ordered stop list
+    $ordered_naptanid = $ordered_line_routes[0]['naptanIds']; // ordered stops
 
     $stop_number = 0;
 
@@ -79,31 +88,34 @@ class RouteReference {
   }
 
   // Function inserts the array of new route reference data into the database
-  function insert_route_reference($database_insert_array) {
-    $sql = "INSERT INTO route_reference (linename,directionid,"
+  private function insert_route_reference($database_insert_array) {
+    $sql = "INSERT INTO $this->route_reference_table (linename,directionid,"
                ."stopcode2,stopnumber) "
 	       ."VALUES (:linename, :directionid, :stopcode2, :stopnumber)";
 
     $save_route = $this->DBH->prepare($sql);
 
     foreach($database_insert_array as $entry) {
-      $save_route->bindValue(':linename', $entry['linename'],PDO::PARAM_STR);
-      $save_route->bindValue(':directionid', $entry['directionid'],PDO::PARAM_INT);
-      $save_route->bindValue(':stopcode2', $entry['stopcode2'],PDO::PARAM_STR);
-      $save_route->bindValue(':stopnumber', $entry['stopnumber'],PDO::PARAM_INT);
+      $save_route->bindValue(':linename', $entry['linename'],
+			     PDO::PARAM_STR);
+      $save_route->bindValue(':directionid', $entry['directionid'],
+			     PDO::PARAM_INT);
+      $save_route->bindValue(':stopcode2', $entry['stopcode2'],
+      			     PDO::PARAM_STR);
+      $save_route->bindValue(':stopnumber', $entry['stopnumber'],
+			     PDO::PARAM_INT);
       $save_route->execute();
     }
   }
 
   // Function deletes all old data from the route reference database
-  function delete_database_contents() {
-    $sql = "DELETE FROM route_reference";
+  private function delete_database_contents() {
+    $sql = "DELETE FROM $this->route_reference_table";
     $this->database->execute_sql($sql);
   }
 
-
   // Function returns an array of line names from the data returned by the API
-  function get_all_linenames($json_array) {
+  private function get_all_linenames($json_array) {
     $all_linenames = array();
 
     foreach($json_array as $linename) {
@@ -114,7 +126,7 @@ class RouteReference {
 
   // Function downloads the data from the API, saves to a file and returns the
   // data as an array
-  function download_json($api_url) {
+  private function download_json($api_url) {
     $fp = fopen("route_reference_data.txt","w+");
 
     $Http = new HttpClient($api_url, $fp);
