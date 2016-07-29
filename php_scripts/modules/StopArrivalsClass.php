@@ -1,5 +1,12 @@
 <?php
 
+// StopArrivalsClass.php
+// Anthony Miles Flynn
+// (29/07/16)
+// Processes the data held in the prediction table, 6 hours after the prediction
+// received.  For each uniqueid and stopid, extracts the entry with the most
+// recent record time as representing the arrival time of the bus at that stop.
+
 include '/data/individual_project/php/modules/DatabaseClass.php';
 
 class StopArrivals { 
