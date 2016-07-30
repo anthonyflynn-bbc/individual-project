@@ -9,7 +9,7 @@
 
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
-class LinkTimesDate {
+class LinkTimesDateFunctions {
   private $database;
   private $DBH;
   private $process_time_unix; // time that the process is run
@@ -55,12 +55,12 @@ class LinkTimesDate {
 
   // Function calculates the average journey time between each pair of stops 
   // which are adjacent to each other on one or more bus routes
-  private function extract_journey_times($start_time, $end_time) {
+  public function extract_journey_times($start_time, $end_time) {
     echo "Extracting average times between links...";
 
     $sql = "SELECT source.stopid AS start, destination.stopid AS end, "
-    	  ."AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime," 
-	  		             ."source.estimatedtime))) AS average_time "
+    	  ."AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime,"
+	  		      	     ."source.estimatedtime))) AS average_time "
 	  ."FROM $this->arrival_table AS source "
 	  ."JOIN "
 	  ."$this->arrival_table AS destination "
@@ -82,7 +82,7 @@ class LinkTimesDate {
 
   // Function inserts all of the calculated average journey times between stops
   // (contained in $journey_times) into the relevant database table
-  private function insert_into_database($journey_times, $process_date, $hod) {
+  public function insert_into_database($journey_times, $process_date, $hod) {
     echo "Inserting link times into database...";
 
     $sql = "INSERT INTO $this->link_times_date_table (start_stopid,end_stopid,"
@@ -103,7 +103,7 @@ class LinkTimesDate {
 
   // Function deletes data from the arrivals database that has already 
   // been processed (to prevent it becoming too big and slowing performance
-  private function delete_old_data() {
+  public function delete_old_data() {
     echo "Deleting processed data...";
 
     $start_time_unix = strtotime('yesterday',$this->process_time_unix);
