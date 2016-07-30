@@ -1,24 +1,22 @@
 <?php
-//345678901234567890123456789012345678901234567890123456789012345678901234567890
-// StopReferenceUpdateClass.php
+
+// StopReferenceUpdateFunctions.php
 // Anthony Miles Flynn
 // (29/07/16)
-// Checks the baseversion array provided by TfL to determine whether stop
-// reference data has been updated.  If so, the relevant table in the database
-// is updated with the most recent data.
+// Public versions of StopReferenceUpdateClass - used for unit testing
 
-include_once '/data/individual_project/php/modules/stream_wrappers/'
-	    .'StopReferenceStreamWrapperClass.php';
+include_once '/data/individual_project/php/test_files/php_unit/StopReference/'
+	    .'StopReferenceStreamWrapperClassTest.php';
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 include_once '/data/individual_project/php/modules/HttpClientClass.php';
 
-class StopReferenceUpdate {
-  private $previous_version;
-  private $baseversion_array;
-  private $current_version;
+class StopReferenceFunctions {
+  public $previous_version;
+  public $baseversion_array;
+  public $current_version;
   private $database;
   private $DBH; 
-  private $fp;
+  public $fp;
   private $temporary_database; // used to hold new data before transferred to old
   private $permanent_database; // database used by application
   private $stop_reference_schema;
@@ -53,12 +51,12 @@ class StopReferenceUpdate {
 
   // Function extracts the baseversion stamp reflecting the version of the data
   // contained in stop_reference
-  private function get_previous_version() {
+  public function get_previous_version() {
     return trim(file_get_contents($this->version_file),"\n");
   }
 
   // Function gets the current version of baseversion from the TfL feed
-  private function get_baseversion_array() {
+  public function get_baseversion_array() {
     $version_url = "http://countdown.api.tfl.gov.uk/interfaces/ura/instant_V1?"
 	          ."ReturnList=BaseVersion";
 
@@ -68,7 +66,7 @@ class StopReferenceUpdate {
 
   // Function gets the current version of the data based on the baseversion
   // array downloaded from the TfL feed
-  private function get_current_version() {  
+  public function get_current_version() {  
     for ($i=0; $i < count($this->baseversion_array); $i++) {
       //remove characters from front and back ('[',']' and newline character)
       $trimmed = trim($this->baseversion_array[$i], "[]\n\r"); 
@@ -94,7 +92,7 @@ class StopReferenceUpdate {
   }
 
   // Function updates the stop reference database table to the latest version
-  private function update_data() {
+  public function update_data() {
     $url = "http://countdown.api.tfl.gov.uk/interfaces/ura/instant_V1?"
 	   ."StopAlso=true&ReturnList=StopPointName,StopID,StopCode1,StopCode2,"
 	   ."StopPointType,Towards,Bearing,StopPointIndicator,StopPointState,"
@@ -118,7 +116,7 @@ class StopReferenceUpdate {
 
   // Function compares the permanent and temporary versions of the stop 
   // reference database and updates the permanent version to reflect changes
-  private function make_database_updates() {
+  public function make_database_updates() {
     // Fetch additions and removals in new database:
     $additions = $this->get_difference($this->temporary_database, $this->permanent_database);
     $removals = $this->get_difference($this->permanent_database, $this->temporary_database);
@@ -143,7 +141,7 @@ class StopReferenceUpdate {
 
   // Function extracts the stop data for any stops where the stopid appears in
   // $database1 but does not in $database2
-  private function get_difference($database1, $database2) {
+  public function get_difference($database1, $database2) {
     $sql = "SELECT * "
           ."FROM $database1 "
 	  ."WHERE stopid IN "
@@ -157,7 +155,7 @@ class StopReferenceUpdate {
   }
 
   // Function inserts any new stops into the stop_reference table
-  private function make_insertion($stop) {
+  public function make_insertion($stop) {
     $sql = "INSERT INTO $this->permanent_database "
     	  .$this->stop_reference_schema
 	  ."VALUES("
@@ -177,7 +175,7 @@ class StopReferenceUpdate {
   }
 
   // Function removes any old stops from the stop_reference table
-  private function make_removal($stop) {
+  public function make_removal($stop) {
     $sql = "DELETE FROM $this->permanent_database "
     	  ."WHERE stopid = ".$this->DBH->quote($stop['stopid']);
 
@@ -186,7 +184,7 @@ class StopReferenceUpdate {
 
   // Function extracts the stop data for any stops where there have been any
   // changes to the details related to that stop
-  private function get_updates($database1, $database2) {
+  public function get_updates($database1, $database2) {
     $sql = "SELECT * "
     	  ."FROM $database1 "
 	  ."EXCEPT "
@@ -198,7 +196,7 @@ class StopReferenceUpdate {
 
   // Function updates any stops in the stop_reference table where any details
   // have changed
-  private function make_update($stop) {
+  public function make_update($stop) {
     $this->DBH->beginTransaction();
     $this->make_removal($stop);
     $this->make_insertion($stop);
@@ -207,7 +205,7 @@ class StopReferenceUpdate {
 
   // Function saves the updated baseversion stamp of the data contained in
   // stop_reference to the file 'version.txt'
-  private function save_latest_version() {
+  public function save_latest_version() {
     $version_handle = fopen($this->version_file,"w");
 
     if($version_handle) {

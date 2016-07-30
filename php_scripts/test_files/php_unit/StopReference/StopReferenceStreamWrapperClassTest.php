@@ -17,11 +17,11 @@ class StopReferenceWrapper {
   private $stop_reference_schema;
 
   // function called immediately after wrapper initialised
-  public function stream_open($path, $mode, $options, &$opened_path) {
+  function stream_open($path, $mode, $options, &$opened_path) {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
-    $this->temporary_database = "stop_reference_temp";
-    $this->permanent_database = "stop_reference";
+    $this->temporary_database = "phpunit_stop_reference_temp";
+    $this->permanent_database = "phpunit_stop_reference";
     $this->stop_reference_schema = 
     	"(stoppointname,stopid,stopcode1,stopcode2,stoppointtype,towards,bearing,"
        ."stoppointindicator,stoppointstate,latitude,longitude) ";
@@ -29,9 +29,9 @@ class StopReferenceWrapper {
   }
 
   // function called whenever a write operation is called by cURL
-  public function stream_write($data) {
+  function stream_write($data) {
     $stop_data = explode("\n", $data); //creates array of stop data from stream
-    
+
     // $buff contains the incomplete last line of data that was present when
     // the last batch of data was written to the database (or nothing if there
     // were no incomplete lines).  This is therefore prefixed to the first item
