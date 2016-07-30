@@ -11,7 +11,7 @@ require_once('/data/individual_project/php/test_files/php_unit/LinkTimes/'
 require_once('/data/individual_project/php/modules/LinkTimesDateClass.php');
 
 class LinkTimesDateTest extends TestCase {
-  // Deletes any old test data from test databases
+  // Deletes any old test data from test databases and loads test data
   public function prepare_databases() {
     $db = new Database();
     $sql = "DELETE FROM phpunit_sample_arrivals_live";
