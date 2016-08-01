@@ -1,8 +1,9 @@
 <?php
 
-include ('/data/individual_project/php/modules/ProcessArrivalDataClass.php');
-include ('/data/individual_project/php/modules/LinkTimesDateClass.php');
-include ('/data/individual_project/php/modules/LinkTimesDayClass.php');
+include_once ('/data/individual_project/php/modules/ProcessArrivalDataClass.php');
+include_once ('/data/individual_project/php/modules/LinkTimesDateClass.php');
+include_once ('/data/individual_project/php/modules/LinkTimesDayClass.php');
+include_once ('/data/individual_project/php/modules/JSONUpdateClass.php');
 
 $backup_time = time();
 
@@ -18,5 +19,9 @@ $linktimes_date->complete_update();
 // previous day occurs
 $linktimes_day = new LinkTimesDay($backup_time);
 $linktimes_day->complete_update();
+
+// Update historic JSON route files based on latest data
+$json_update = new JSONUpdate();
+$json_update->complete_updates();
 
 ?>

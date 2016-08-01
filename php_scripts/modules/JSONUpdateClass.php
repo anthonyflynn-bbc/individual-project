@@ -1,4 +1,4 @@
-sy<?php
+<?php
 
 // JSONUpdateClass.php
 // Anthony Miles Flynn
