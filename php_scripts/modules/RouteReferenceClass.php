@@ -7,8 +7,8 @@
 // network, in both directions.  These are saved to the database table provided
 // as a parameter in the constructor method
 
-include '/data/individual_project/php/modules/DatabaseClass.php';
-include '/data/individual_project/php/modules/HttpClientClass.php';
+include_once '/data/individual_project/php/modules/DatabaseClass.php';
+include_once '/data/individual_project/php/modules/HttpClientClass.php';
 
 class RouteReference {
   private $database;
