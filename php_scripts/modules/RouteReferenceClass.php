@@ -2,8 +2,9 @@
 
 // RouteReferenceClass.php
 // Anthony Miles Flynn
-// (29/07/16)
-// Program downloads an ordered sequence of stops for all bus routes in the TfL
+// (11/08/16)
+// Program downloads an ordered sequence of stops and the time taken to travel
+// to it from the previous stop, for all bus routes in the TfL
 // network, in both directions.  These are saved to the database table provided
 // as a parameter in the constructor method
 
@@ -68,24 +69,44 @@ class RouteReference {
     $direction = $this->direction_from_id($directionid);
     $api_url = "https://api.tfl.gov.uk/Line/".$linename."/Route/Sequence/"
   	      .$direction."?serviceTypes=regular,night&app_id=c02bf3c4&"
-	      ."app_key=5b3139aa0ef741b65ae823475f46a8b7";
+	      ."app_key=5b3139aa0ef741b65ae823475f46a8b7"; // route sequence URL
 
     $json_array = $this->download_json($api_url);
-
     $ordered_line_routes = $json_array['orderedLineRoutes'];
 
-    if(count($ordered_line_routes) !== 0) {
+    if(count($ordered_line_routes) !== 0) { // only run section if ordered stop sequence available
       $ordered_naptanid = $ordered_line_routes[0]['naptanIds']; // ordered stops
 
-      $stop_number = 0;
+      // URL to extract total time to reach each stop from the origin stop on this linename
+      $api_url = "https://api.tfl.gov.uk/Line/".$linename."/timetable/".$ordered_naptanid[0]
+                ."?app_id=c02bf3c4&app_key=5b3139aa0ef741b65ae823475f46a8b7";
 
-      foreach($ordered_naptanid as $stopcode2) {
+      $json_array = $this->download_json($api_url);
+
+      // Intervals array contains the total time to reach each stop from line origin
+      $intervals_array = $json_array['timetable']['routes'][0]['stationIntervals'][0]['intervals'];
+
+      // Save detail for the first stop:
+      $details = array('linename'=>$linename,
+      	      	       'directionid'=>$directionid,
+		       'stopcode2'=>$ordered_naptanid[0],
+		       'stopnumber'=>0,
+		       'timetable_linktime'=>0);
+      $database_insert_array[] = $details;
+
+      $stop_number = 1;
+      $previous_stop_interval = 0;
+
+      //foreach($ordered_naptanid as $stopcode2) {
+      foreach($intervals_array as $stop) {
         $details = array('linename'=>$linename,
       	      	         'directionid'=>$directionid,
-		         'stopcode2'=>$stopcode2,
-		         'stopnumber'=>$stop_number);
+		         'stopcode2'=>$stop['stopId'],
+		         'stopnumber'=>$stop_number,
+		         'timetable_linktime'=>$stop['timeToArrival'] * 60 - $previous_stop_interval);
         $database_insert_array[] = $details;
         $stop_number++;
+	$previous_stop_interval = $stop['timeToArrival'] * 60;
       }
     }
   }
@@ -93,8 +114,9 @@ class RouteReference {
   // Function inserts the array of new route reference data into the database
   private function insert_route_reference($database_insert_array) {
     $sql = "INSERT INTO $this->route_reference_table (linename,directionid,"
-               ."stopcode2,stopnumber) "
-	       ."VALUES (:linename, :directionid, :stopcode2, :stopnumber)";
+               ."stopcode2,stopnumber,timetable_linktime) "
+	       ."VALUES (:linename, :directionid, :stopcode2, 
+	       		 :stopnumber, :timetable_linktime)";
 
     $save_route = $this->DBH->prepare($sql);
 
@@ -106,6 +128,8 @@ class RouteReference {
       $save_route->bindValue(':stopcode2', $entry['stopcode2'],
       			     PDO::PARAM_STR);
       $save_route->bindValue(':stopnumber', $entry['stopnumber'],
+			     PDO::PARAM_INT);
+      $save_route->bindValue(':timetable_linktime', $entry['timetable_linktime'],
 			     PDO::PARAM_INT);
       $save_route->execute();
     }
