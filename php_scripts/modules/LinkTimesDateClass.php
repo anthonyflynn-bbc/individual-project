@@ -46,7 +46,7 @@ class LinkTimesDate {
       		  			 $start_time_unix + 60 * 60)); //+1 hour
       $journey_times = $this->extract_journey_times($start_time, $end_time);
       $this->insert_into_database($journey_times, $process_date, $hod);
-      $start_time_unix = $start_time_unix + 60 * 60; // +1 hour
+      $start_time_unix += 60 * 60; // +1 hour
       echo "Update complete for hour ".$hod."\n";
     }
     $this->delete_old_data();
@@ -59,8 +59,8 @@ class LinkTimesDate {
     echo "Extracting average times between links...";
 
     $sql = "SELECT source.stopid AS start, destination.stopid AS end, "
-    	  ."AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime," 
-	  		             ."source.estimatedtime))) AS average_time "
+    	  ."ROUND(AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime," 
+	  		             ."source.estimatedtime)))) AS average_time "
 	  ."FROM $this->arrival_table AS source "
 	  ."JOIN "
 	  ."$this->arrival_table AS destination "

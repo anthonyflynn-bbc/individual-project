@@ -2,7 +2,7 @@
 
 // LinkTimesDayClass.php
 // Anthony Miles Flynn
-// (30/07/16)
+// (11/08/16)
 // Calculates the average time taken between all consecutive stopids occurring 
 // on any of the TfL network bus lines.  Averages are calculated on an hourly 
 // basis, and the data is averaged across days of the week, based on the 
@@ -23,9 +23,9 @@ class LinkTimesDay {
 
   // Constructor
   public function __construct($process_time_unix,
+			      $link_times_date_table = "link_times_date",
 			      $route_table = "route_reference",
 			      $stop_table = "stop_reference",
-			      $link_times_date_table = "link_times_date",
 			      $link_times_day_table = "link_times_average") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
@@ -64,7 +64,7 @@ class LinkTimesDay {
     	  ."WHERE day = $dow ";
 
     $this->database->execute_sql($sql);
-    
+
     echo "Complete\n";
   }
 
@@ -73,7 +73,7 @@ class LinkTimesDay {
   private function extract_link_times($dow, $hod) {
     echo "Extracting link times...";
 
-    $sql = "SELECT start_stopid, end_stopid, AVG(link_time) AS link_time "
+    $sql = "SELECT start_stopid, end_stopid, ROUND(AVG(link_time)) AS link_time "
 	  ."FROM $this->link_times_date_table, "
 	  ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
 	  ."FROM ($this->route_table NATURAL JOIN $this->stop_table) AS a, "
@@ -86,7 +86,7 @@ class LinkTimesDay {
 	  ."AND start_stopid = x "
 	  ."AND end_stopid = y "
 	  ."GROUP BY start_stopid, end_stopid";
-    
+
     return $this->database->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
   }
 
@@ -108,7 +108,7 @@ class LinkTimesDay {
 			    PDO::PARAM_STR);
       $save_time->bindValue(':hour', $hod, PDO::PARAM_INT);
       $save_time->bindValue(':day', $dow, PDO::PARAM_INT);
-      $save_time->bindValue(':link_time', $entry['link_time']);
+      $save_time->bindValue(':link_time', $entry['link_time'], PDO::PARAM_INT);
       $save_time->execute();
     }
     echo "Complete\n";
