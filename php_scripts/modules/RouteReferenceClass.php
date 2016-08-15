@@ -31,27 +31,29 @@ class RouteReference {
     $linename_array = $this->get_all_linenames($json_array);
 
     // For each bus line (in each direction), extract ordered stop sequence
-    $database_insert_array = array(); // stores info to insert into database
     $number_linenames = count($linename_array); // total number of bus lines
-    $count = 0;
-
-    $this->DBH->beginTransaction();
-    $this->delete_database_contents();
 
     foreach($linename_array as $linename) {
+      $database_insert_array = array(); // stores info to insert into database
       $this->get_stops($linename, 1, $database_insert_array); //outbound
       $this->get_stops($linename, 2, $database_insert_array); //inbound
-      $count++;
-      echo "saved to array: ".$linename."\n";
 
-      // save records every 5 bus lines (to avoid array getting too big)
-      if($count % 5 == 0 || $count == $number_linenames) {
-        $this->insert_route_reference($database_insert_array);
-    	$database_insert_array = array();
-      }
+      $this->DBH->beginTransaction();
+      $this->delete_from_database($linename);
+      $this->insert_route_reference($database_insert_array);
+      $this->DBH->commit();
     }
-    $this->DBH->commit();
+
   }
+
+  // Function deletes all old data from the route reference database
+  private function delete_from_database($linename) {
+    $sql = "DELETE FROM $this->route_reference_table "
+    	  ."WHERE linename = '$linename'";
+
+    $this->database->execute_sql($sql);
+  }
+
 
   // Function returns the correct direction in words for a given TfL directionid
   private function direction_from_id($directionid) {
@@ -83,30 +85,31 @@ class RouteReference {
 
       $json_array = $this->download_json($api_url);
 
-      // Intervals array contains the total time to reach each stop from line origin
-      $intervals_array = $json_array['timetable']['routes'][0]['stationIntervals'][0]['intervals'];
+      if(!array_key_exists("statusErrorMessage", $json_array)) { // check not TfL error messages (e.g. stop removed)
+        // Intervals array contains the total time to reach each stop from line origin
+        $intervals_array = $json_array['timetable']['routes'][0]['stationIntervals'][0]['intervals'];
 
-      // Save detail for the first stop:
-      $details = array('linename'=>$linename,
-      	      	       'directionid'=>$directionid,
-		       'stopcode2'=>$ordered_naptanid[0],
-		       'stopnumber'=>0,
-		       'timetable_linktime'=>0);
-      $database_insert_array[] = $details;
-
-      $stop_number = 1;
-      $previous_stop_interval = 0;
-
-      //foreach($ordered_naptanid as $stopcode2) {
-      foreach($intervals_array as $stop) {
+        // Save detail for the first stop:
         $details = array('linename'=>$linename,
       	      	         'directionid'=>$directionid,
-		         'stopcode2'=>$stop['stopId'],
-		         'stopnumber'=>$stop_number,
-		         'timetable_linktime'=>$stop['timeToArrival'] * 60 - $previous_stop_interval);
+		         'stopcode2'=>$ordered_naptanid[0],
+		         'stopnumber'=>0,
+		         'timetable_linktime'=>0);
         $database_insert_array[] = $details;
-        $stop_number++;
-	$previous_stop_interval = $stop['timeToArrival'] * 60;
+
+        $stop_number = 1;
+        $previous_stop_interval = 0;
+
+        foreach($intervals_array as $stop) {
+          $details = array('linename'=>$linename,
+      	      	           'directionid'=>$directionid,
+		           'stopcode2'=>$stop['stopId'],
+		           'stopnumber'=>$stop_number,
+		           'timetable_linktime'=>$stop['timeToArrival'] * 60 - $previous_stop_interval);
+          $database_insert_array[] = $details;
+          $stop_number++;
+	  $previous_stop_interval = $stop['timeToArrival'] * 60;
+        }
       }
     }
   }
@@ -133,12 +136,6 @@ class RouteReference {
 			     PDO::PARAM_INT);
       $save_route->execute();
     }
-  }
-
-  // Function deletes all old data from the route reference database
-  private function delete_database_contents() {
-    $sql = "DELETE FROM $this->route_reference_table";
-    $this->database->execute_sql($sql);
   }
 
   // Function returns an array of line names from the data returned by the API
