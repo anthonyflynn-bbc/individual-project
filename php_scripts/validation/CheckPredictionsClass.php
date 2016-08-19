@@ -48,6 +48,8 @@ class CheckPredictions {
       $historic_prediction = $prediction[6];
       $current_prediction = $prediction[7];
 
+      echo "Calculating for line ".$linename." and directionid ".$directionid."...";
+
       $uniqueid = $this->get_best_uniqueid($linename, $directionid, 
       		  			   $record_time, $start_stopid);
       $actual_time = $this->get_journey_information($uniqueid, $start_stopid, 
@@ -61,6 +63,7 @@ class CheckPredictions {
       	      	      $end_stopid, $actual_time, $timetable_accuracy, 
 		      $historic_accuracy, $current_accuracy);
       $this->results_array[] = $result;
+      echo "Complete.\n";
     }
     $this->save_results();
   }
