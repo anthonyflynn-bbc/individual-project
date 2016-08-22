@@ -1,9 +1,5 @@
 <?php
 
-// PARAMETERS TO TWEAK:
-  // How long in past look at 'current' bus arrivals
-  // How long after no more updates recorded to assume arrival
-
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
 class LiveArrivals {
@@ -16,10 +12,10 @@ class LiveArrivals {
   private $link_times = array(); // holds linktimes between stopids.
   private $route_sequence; // key = linename, elements = (directionid=>array of stopids)
   private $last_update_time_unix;
-  private $json_save_directory = "/data/individual_project/api/route_api/data/current/";
+  private $json_save_directory = "/data/individual_project/api/route_api/data/current/"; 
 
   // Constructor
-  public function __construct($wait_period=300, $arrivals_cache=3600) {
+  public function __construct($wait_period=300, $arrivals_cache=3600, $save_folder="") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
     $this->wait_period = $wait_period; // default 5 mintues
@@ -27,6 +23,7 @@ class LiveArrivals {
     $this->last_update_time_unix = time() - 3600; // initially loads 1 hour of historic predictions
     $this->route_sequence = $this->load_parse_json("tfl.doc.ic.ac.uk/routes/"
 						   ."route_reference.json");
+    $this->json_save_directory .= $save_folder; // appends save folder to directory
   }
 
   // Function cycles through latest stop predictions and looks for arrivals
@@ -44,6 +41,7 @@ class LiveArrivals {
       $this->process_linktimes();
       $this->create_json_files();
       $this->delete_stale_arrivals();
+      $this->delete_stale_linktimes();
       sleep(5 * 60); // sleep for 5 minutes, then process the next batch
       echo "Complete.  Sleeping for 5 minutes\n";
     }
@@ -190,6 +188,17 @@ class LiveArrivals {
     }
   }
 
+  // Function removes any old records from link_times array
+  private function delete_stale_linktimes() {
+    foreach($this->link_times as $linkid=>$arrival_time_array) {
+      foreach($arrival_time_array as $arrival_time=>$uniqueid_array) {
+        if(($this->last_update_time_unix - $arrival_time) > 2 * 3600) { // delete link times that are > 2 hours old
+	  unset($this->link_times[$linkid][$arrival_time]);	  
+	}
+      }
+    }
+  }
+
   // Function cycles through all routes (in both directions), extracts ordered 
   // sequence of linkids, extracts the latest information from the link_times 
   // array and generates a JSON file with a summary.  The JSON contains up the 
@@ -203,7 +212,11 @@ class LiveArrivals {
 	  $times = array(); // array with key = uniqueid and value = linktime
 	  if(array_key_exists($linkid, $this->link_times)) {
 	    foreach($this->link_times[$linkid] as $arrival_time=>$uniqueid_linktime) {
-	      $times += $uniqueid_linktime;
+
+	      $save_format = array(key($uniqueid_linktime)=>array($arrival_time, $uniqueid_linktime[key($uniqueid_linktime)]));
+
+	      $times += $save_format;
+	      
 	      if(count($times) >= 100) {
 	        break;
 	      }

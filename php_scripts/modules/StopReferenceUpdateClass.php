@@ -33,7 +33,6 @@ class StopReferenceUpdate {
     $this->previous_version = $this->get_previous_version();
     $this->baseversion_array = $this->get_baseversion_array();
     $this->current_version = $this->get_current_version();
-
     if($this->update_required() === false) {
       exit(0); // exits script if stop data up to date, otherwise continues
     }
@@ -49,6 +48,7 @@ class StopReferenceUpdate {
        ."stoppointindicator,stoppointstate,latitude,longitude) ";
     $this->fp = fopen("StopReferenceWrapper://StopStream","r+")
       or die("Error opening wrapper file handler"); 
+    $this->update_data();
   }
 
   // Function extracts the baseversion stamp reflecting the version of the data

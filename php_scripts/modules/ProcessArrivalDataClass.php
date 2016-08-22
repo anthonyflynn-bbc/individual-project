@@ -1,26 +1,46 @@
 <?php
 
+// ProcessArrivalDataClass.php
+// Anthony Miles Flynn
+// (10/08/16)
+// ADD DESCRIPTION!
+
+
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
 class ProcessArrivals {
-  protected $database;
-  protected $DBH;
-  protected $backup_time_unix;
+  private $database;
+  private $DBH;
+  private $process_time_unix;
+  private $arrival_table; // stop arrivals data
+  private $arrival_table_backup; // stop arrivals backup table
+  private $route_table; // route reference data
+  private $stop_table; // stop reference data
 
   // Constructor
-  function __construct($backup_time_unix) {
+  public function __construct($process_time_unix,
+			      $arrival_table = "batch_journey_all",
+			      $arrival_table_backup = "batch_journey_backup",
+			      $route_table = "route_reference",
+			      $stop_table = "stop_reference") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
-    $this->backup_time_unix = $backup_time_unix;
+    $this->process_time_unix = $process_time_unix;
+    $this->arrival_table = $arrival_table;
+    $this->arrival_table_backup = $arrival_table_backup;
+    $this->route_table = $route_table;
+    $this->stop_table = $stop_table;
   }
 
-  // Function to remove duplicate arrival predictions where the same uniqueid + stopid + visitnumber
-  // is processed by stop_prediction in two batches in the same second
-  function process_data() {
-    $previous_day_unix = strtotime('yesterday',$this->backup_time_unix);
-    $relevant_uniqueids = "'".date("Ymd",$previous_day_unix)."%'"; // date for which the duplicates should be removed
+  // Function to remove duplicate arrival predictions where the same 
+  // uniqueid + stopid + visitnumber is processed by stop_prediction in two 
+  // batches in the same second
+  public function process_data() {
+    $previous_day_unix = strtotime('yesterday',$this->process_time_unix);
+    $relevant_uniqueids = "'".date("Ymd",$previous_day_unix)."%'"; 
+    		// date for which the duplicates should be removed
 
-    $start_time_unix = strtotime('yesterday',$this->backup_time_unix);
+    $start_time_unix = strtotime('yesterday',$this->process_time_unix);
     $end_time_unix = $start_time_unix + 24 * 60 * 60;
     $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_time_unix));
     $end_time = $this->DBH->quote(date('Y-m-d H:i:s', $end_time_unix));
@@ -28,7 +48,7 @@ class ProcessArrivals {
     $duplicates = $this->identify_duplicates($relevant_uniqueids);
     $selected_rows = $this->select_best_results($duplicates);
 
-    $this->make_backup($start_time, $end_time); // make a backup of the data before altering
+    $this->make_backup($start_time, $end_time); // make backup before altering
 
     $this->DBH->beginTransaction();
     $this->delete_duplicates($relevant_uniqueids);
@@ -41,25 +61,27 @@ class ProcessArrivals {
     echo "Removal of negative linktimes complete.\n";
   }
 
-  // Function identifies those lines in the batch database which have more than one prediction
-  // for the same uniqueid + stopid + visitnumber combination
-  function identify_duplicates($relevant_uniqueids) {
-    echo "Identifying duplicate lines...\n";
+  // Function identifies those lines in the batch database which have more than 
+  // one prediction for the same uniqueid + stopid + visitnumber combination
+  private function identify_duplicates($relevant_uniqueids) {
+    echo "Identifying duplicate lines...";
 
     $sql =  "SELECT * "
     	   ."FROM "
 	   ."(SELECT uniqueid, stopid, visitnumber, COUNT(recordtime) "
-	   ."FROM (SELECT * FROM batch_journey_all WHERE uniqueid LIKE $relevant_uniqueids) AS relevant "
+	   ."FROM (SELECT * FROM $this->arrival_table "
+	          ."WHERE uniqueid LIKE $relevant_uniqueids) AS relevant "
 	   ."GROUP BY uniqueid, stopid, visitnumber "
 	   ."HAVING COUNT(recordtime) > 1) AS duplicates "
-	   ."JOIN batch_journey_all USING(uniqueid) "
-	   ."WHERE batch_journey_all.stopid = duplicates.stopid";
+	   ."JOIN $this->arrival_table USING(uniqueid) "
+	   ."WHERE $this->arrival_table.stopid = duplicates.stopid";
 
     return $this->database->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
   }
 
   // Function processes the duplicate results to identify the best arrival data.
-  function select_best_results($duplicates) {
+  private function select_best_results($duplicates) {
+    echo "Selecting best results...";
     $selected_rows = array();
 
     foreach($duplicates as $entry) {
@@ -83,28 +105,31 @@ class ProcessArrivals {
 	$selected_rows[$stop_array_key] = $details;
       }
     }
+  echo "Complete.\n";
   return $selected_rows;
   }
 
   // Function deletes any duplicate lines from the batch database
-  function delete_duplicates($relevant_uniqueids) {
+  private function delete_duplicates($relevant_uniqueids) {
     echo "Deleting duplicate rows...";
 
-    $sql = "DELETE FROM batch_journey_all "
+    $sql = "DELETE FROM $this->arrival_table "
     	  ."WHERE (uniqueid, stopid, visitnumber) IN ( "
 	  ."SELECT uniqueid, stopid, visitnumber "
-	  ."FROM (SELECT * FROM batch_journey_all WHERE uniqueid LIKE $relevant_uniqueids) AS relevant "   
-	  ."GROUP BY uniqueid, stopid, visitnumber "
-	  ."HAVING COUNT(recordtime) > 1)";
+	  ."FROM (SELECT * FROM $this->arrival_table "
+	        ."WHERE uniqueid LIKE $relevant_uniqueids) AS relevant "   
+	  	."GROUP BY uniqueid, stopid, visitnumber "
+	  	."HAVING COUNT(recordtime) > 1)";
 
     $this->database->execute_sql($sql);
     echo "Complete.\n";
   }
 
-  // Function inserts the best arrival data (for those with duplicates) into the batch database
-  function insert_best_results($selected_rows) {
+  // Function inserts the best arrival data (for those with duplicates) into the 
+  // batch database 
+  private function insert_best_results($selected_rows) {
     echo "Inserting correct rows...";
-    $sql = "INSERT INTO batch_journey_all (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
+    $sql = "INSERT INTO $this->arrival_table (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
           ."VALUES (:stopid, :visitnumber, :destinationtext, :vehicleid, :estimatedtime, :expiretime, :recordtime, :uniqueid)";
 
     $insert_rows = $this->DBH->prepare($sql);
@@ -124,12 +149,12 @@ class ProcessArrivals {
 
   // Function moves data which has already been used to calculate link times to a backup
   // database to ensure database queries remain manageable as data expands
-  function make_backup($start_time, $end_time) {
+  private function make_backup($start_time, $end_time) {
     echo "Copying data to backup database...";
 
-    $sql = "INSERT INTO batch_journey_backup (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
+    $sql = "INSERT INTO $this->arrival_table_backup (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
           ."SELECT * "
-	  ."FROM batch_journey_all "
+	  ."FROM $this->arrival_table "
 	  ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
 
     $this->database->execute_sql($sql);
@@ -137,15 +162,15 @@ class ProcessArrivals {
   }
 
   // Function deletes negative linktimes from the batch journey database
-  function delete_negative_linktimes($start_time, $end_time) {
+  private function delete_negative_linktimes($start_time, $end_time) {
     echo "Deleting negative linktimes...";
-    $sql = "DELETE FROM batch_journey_all "
+    $sql = "DELETE FROM $this->arrival_table "
     	  ."WHERE (uniqueid, stopid) IN "
 	  ."(SELECT uniqueid, destination.stopid AS end "
-	  ."FROM batch_journey_all AS source JOIN batch_journey_all AS destination USING(uniqueid), "
+	  ."FROM $this->arrival_table AS source JOIN $this->arrival_table AS destination USING(uniqueid), "
 	  ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
-	  ."FROM (route_reference NATURAL JOIN stop_reference) AS a JOIN "
-	  ."(route_reference NATURAL JOIN stop_reference) AS b "
+	  ."FROM ($this->route_table NATURAL JOIN $this->stop_table) AS a JOIN "
+	  ."($this->route_table NATURAL JOIN $this->stop_table) AS b "
 	  ."ON a.linename = b.linename "
 	  ."AND a.directionid = b.directionid "
 	  ."AND (b.stopnumber - a.stopnumber) = 1) as connected_stops "
