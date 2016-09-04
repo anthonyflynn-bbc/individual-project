@@ -1,5 +1,11 @@
 <?php
 
+// check_stop_predictions_process.php
+// Anthony Miles Flynn
+// (4/9/16)
+// Script for determining whether the stop predictions process is running
+// and whether data is still being received from the TfL servers
+
 // EXTRACT THE PROCESS ID OF THE RELEVANT SCRIPT ///////////////////////////////
 
 $PID=-1;
