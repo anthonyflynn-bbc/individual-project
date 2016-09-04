@@ -64,13 +64,13 @@ class StopArrivals {
   private function get_stop_arrivals() {
     $sql = "SELECT $this->prediction_table.* "
 	  ."FROM $this->prediction_table, "
-	  ."(SELECT stopid, uniqueid, MAX(recordtime) AS arrival_time "
+	  ."(SELECT stopid, uniqueid, visitnumber, MAX(recordtime) AS arrival_time "
 	  ."FROM $this->prediction_table "
 	  ."WHERE uniqueid IN "
 	  ."(SELECT uniqueid "
 	  ."FROM $this->prediction_table "
 	  ."WHERE estimatedtime BETWEEN $this->start_time AND $this->end_time) "
-	  ."GROUP BY stopid, uniqueid) arrivals "
+	  ."GROUP BY stopid, uniqueid, visitnumber) arrivals "
 	  ."WHERE $this->prediction_table.uniqueid = arrivals.uniqueid "
 	  ."AND $this->prediction_table.stopid = arrivals.stopid "
 	  ."AND $this->prediction_table.recordtime = arrivals.arrival_time";
