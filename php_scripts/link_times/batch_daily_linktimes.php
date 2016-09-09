@@ -1,5 +1,13 @@
 <?php
 
+// batch_daily_linktimes.php
+// Anthony Miles Flynn
+// (8/9/16)
+// Process for running the ProcessArrivals class (for modifying stop arrivals data),
+// LinkTimesDate class (for extracting link times for the previous day into the link
+// times date relation), LinkTimesDay (for updating the average link times in the
+// link times day relation), and generating new historical JSON output files.
+
 include_once ('/data/individual_project/php/modules/ProcessArrivalDataClass.php');
 include_once ('/data/individual_project/php/modules/LinkTimesDateClass.php');
 include_once ('/data/individual_project/php/modules/LinkTimesDayClass.php');
