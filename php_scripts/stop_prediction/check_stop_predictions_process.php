@@ -25,7 +25,7 @@ foreach($ps_result as $line) {
   }
 }
 
-if($PID == -1) { // process does not exist
+if($PID == -1) {
   echo "process doesn't exist";
   exit(2);
 }

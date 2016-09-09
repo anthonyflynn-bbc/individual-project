@@ -3,7 +3,7 @@
 # check_stop_predictions_process.sh
 # Anthony Miles Flynn
 # (4/9/16)
-# Script for running the process to determine whether the stop predictions process
+# Script for running the process to determine if the stop predictions process
 # is running and whether data being received, and to restart the process if not
 
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
