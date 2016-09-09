@@ -3,13 +3,13 @@
 // update_reference.php
 // Anthony Miles Flynn
 // (8/9/16)
-// Class for running StopReferenceUpdate class (to determine if stop reference
-// data hase been updated.  If so, the stop_reference and route_reference
-// relations are updated and new JSON output files are created.
+// Process for running StopReferenceUpdate class (to determine if stop reference
+// data hase been updated).  If so, the stop reference and route reference
+// relations are updated and new route JSON output files are created.
 
-include ('/data/individual_project/php/modules/StopReferenceUpdateClass.php');
-include ('/data/individual_project/php/modules/RouteReferenceClass.php');
-include ('/data/individual_project/php/modules/RouteReferenceJSONUpdateClass.php');
+include_once ('/data/individual_project/php/modules/StopReferenceUpdateClass.php');
+include_once ('/data/individual_project/php/modules/RouteReferenceClass.php');
+include_once ('/data/individual_project/php/modules/RouteReferenceJSONUpdateClass.php');
 
 // Check if any update to baseversion, and if so, update stop_reference
 $stop_reference_process = new StopReferenceUpdate();
