@@ -63,7 +63,7 @@ class RouteReferenceTest extends TestCase {
     $functions = new RouteReferenceFunctions("phpunit_route_reference");
     $data = $functions->download_json($url);
     $results = $functions->get_all_linenames($data);
-    $this->assertCount(657, $results);
+    $this->assertCount(658, $results);
   }
 
   // Function deletes any existing information in the route reference table

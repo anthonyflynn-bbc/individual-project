@@ -1,13 +1,20 @@
 <?php
 
+// uniqueid_data_rate_test.php
+// Anthony Miles Flynn
+// (08/09/16)
+// Script for testing that the StopPredictionStreamWrapperClass is able
+// to process received prediction data from TfL sufficiently quickly
+// to prevent data loss
+
 // SET UP DATABASE CONNECTION /////////////////////////////////////////
 
 // Database access information:
 $database_type = 'pgsql';
-$server_ip = "";
+$server_ip = "146.169.47.42";
 $database_name = "bus_data";
-$username = "";
-$password = "";
+$username = "testuser";
+$password = "testpassword";
 
 
 // Create database connection:
@@ -36,8 +43,11 @@ class tflStreamWrapper {
     $this->array_date = date('Ymd',strval(time())); // set to current date
     $this->journey_daycount = 1;
     $this->load_uniqueid_array();
-    $this->output_summary_handle = fopen("/data/individual_project/php/test_files/data_rate_test/output_data.txt", "w"); // ADDED FOR DATA RATE TEST
-    fwrite($this->output_summary_handle, "Lines read in,For-loop count,Database writes,Process start time,Minimum estimatedtime,Difference\n"); // ADDED FOR DATA RATE TEST
+    $this->output_summary_handle = fopen("/data/individual_project/php/"
+					."test_files/data_rate_test/output_data.txt",
+					"w"); // ADDED FOR DATA RATE TEST
+    fwrite($this->output_summary_handle, "Lines read in,For-loop count,Database writes,"
+    		."Process start time,Minimum estimatedtime,Difference\n");
     return true;
   }
 
@@ -119,7 +129,19 @@ class tflStreamWrapper {
       }
     }
 
-    $write_result = ($stop_data_count - 1).",".$for_loop_count.",".$database_write_count.",".$unix_time.",".$min_estimatedtime.",".($unix_time - $min_estimatedtime)."\n"; // ADDED FOR DATA RATE TEST
+    /*
+    echo $stop_data[0]."\n"; // ADDED FOR DATA RATE TEST
+    echo "Lines read in: ".($stop_data_count - 1); // ADDED FOR DATA RATE TES
+    echo "; For loop count: ".$for_loop_count; // ADDED FOR DATA RATE TEST
+    echo "; Database writes: ".$database_write_count; // ADDED FOR DATA RATE TEST
+    echo "; Time difference: ".($min_estimatedtime - $unix_time)."\n"; // ADDED FOR DATA RATE TEST
+    echo "Minimum estimatedtime: ".$GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$min_estimatedtime))." Process start time: "
+    	 .$GLOBALS['DBH']->quote(date('Y-m-d H:i:s',$unix_time))."\n";
+    */
+
+    $write_result = ($stop_data_count - 1).",".$for_loop_count.","
+    		    .$database_write_count.",".$unix_time.",".$min_estimatedtime.","
+		    .($unix_time - $min_estimatedtime)."\n"; // ADDED FOR DATA RATE TEST
 
     fwrite($this->output_summary_handle, $write_result); // ADDED FOR DATA RATE TEST
 
@@ -227,10 +249,6 @@ stream_wrapper_register("tflStreamWrapper","tflStreamWrapper")
 $fp = fopen("tflStreamWrapper://tflStream","r+")
   or die("Error opening wrapper file handler");
 
-
-
-
-
 // SET UP cURL SESSION ////////////////////////////////////////////////
 
 // Initialise cURL session:
@@ -244,7 +262,7 @@ curl_setopt($curl, CURLOPT_URL,
 
 curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_DIGEST); // Digest authorisation
 
-curl_setopt($curl, CURLOPT_USERPWD, ":"); // User details
+curl_setopt($curl, CURLOPT_USERPWD, "LiveBus77966:ChUdA6weye"); // User details
 
 curl_setopt($curl, CURLOPT_TIMEOUT, 99999999); // Long-lived connection
 

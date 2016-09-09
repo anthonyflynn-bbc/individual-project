@@ -1,41 +1,69 @@
 <?php
 
-// LinkTimesDateTest.php
+// LinkTimesDayTest.php
 // Anthony Miles Flynn
 // (30/07/16)
-// Program completes unit tests on LinkTimesDateClass.php
+// Program completes unit tests on LinkTimesDayClass.php
 
 use phpunit\framework\TestCase;
-require_once('/data/individual_project/php/test_files/php_unit/LinkTimes/'
-	    .'LinkTimesDateFunctions.php');
+//require_once('/data/individual_project/php/test_files/php_unit/LinkTimes/'
+//	    .'LinkTimesDayFunctions.php');
 require_once('/data/individual_project/php/modules/LinkTimesDateClass.php');
+require_once('/data/individual_project/php/modules/LinkTimesDayClass.php');
 
-class LinkTimesDateTest extends TestCase {
-  // Deletes any old test data from test databases and loads test data
+class LinkTimesDayTest extends TestCase {
+  // Deletes any old test data from test databases and loads correct data
   public function prepare_databases() {
     $db = new Database();
     $sql = "DELETE FROM phpunit_sample_arrivals_live";
+    $db->execute_sql($sql);
+    $sql = "DELETE FROM phpunit_link_times_day";
     $db->execute_sql($sql);
     $sql = "DELETE FROM phpunit_link_times_date";
     $db->execute_sql($sql);
 
     // insert test data into the test database:
     $sql = "INSERT INTO phpunit_sample_arrivals_live "
-    	  ."SELECT * FROM phpunit_link_times_arrivals_data";
+    	  ."SELECT * FROM phpunit_link_times_arrivals_day_data";
     $db->execute_sql($sql);
-  }
 
-  // Tests complete_update function
-  public function test_complete_update() {
+  }
+  
+  // process arrivals data into link_times_date_table
+  public function process_date_information() {
     $this->prepare_databases();
-    $test_time = 1469950200; // 08:30 on 31/7/2016
-    $full_class = new LinkTimesDate($test_time,
+
+    $test_time = 1469345400; // 08:30 on 24/7/2016
+    $date_class = new LinkTimesDate($test_time,
 				   "phpunit_sample_arrivals_live",
 				   "route_reference",
 				   "stop_reference",
 				   "phpunit_link_times_date");
+    $date_class->complete_update();
+
+    $test_time = 1469950200; // 08:30 on 31/7/2016
+    $date_class = new LinkTimesDate($test_time,
+				   "phpunit_sample_arrivals_live",
+				   "route_reference",
+				   "stop_reference",
+				   "phpunit_link_times_date");
+    $date_class->complete_update();
+  }
+
+
+  // Tests complete_update function
+  public function test_complete_update() {
+    $this->process_date_information();
+
+    $test_time = 1469950200; // 08:30 on 31/7/2016
+    $full_class = new LinkTimesDay($test_time,
+				  "phpunit_link_times_date",
+				  "route_reference",
+				  "stop_reference",
+				  "phpunit_link_times_day");
     $full_class->complete_update();
 
+/*
     // Test for first hour
     $db = new Database();
     $sql = "SELECT * FROM phpunit_link_times_date "
@@ -70,8 +98,12 @@ class LinkTimesDateTest extends TestCase {
 	  ."WHERE hour > 2";
     $result = $db->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
     $this->assertCount(0, $result);
+*/
+
   }
 
+
+/*
   // Tests extract_journey_times
   public function test_extract_journey_times() {
     $this->prepare_databases();
@@ -87,7 +119,7 @@ class LinkTimesDateTest extends TestCase {
 					    "stop_reference",
 					    "phpunit_link_times_date");
     $result = $functions->extract_journey_times($start_time, $end_time);
-    $this->assertCount(91, $result);
+    $this->assertCount(98, $result);
   }
 
   // Tests insert_into_database
@@ -157,7 +189,7 @@ class LinkTimesDateTest extends TestCase {
     $result = $db->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
     $this->assertCount(7, $result);
   }
-
+*/
 }
 
 ?>
