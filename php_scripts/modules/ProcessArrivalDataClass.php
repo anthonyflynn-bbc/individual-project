@@ -2,9 +2,9 @@
 
 // ProcessArrivalDataClass.php
 // Anthony Miles Flynn
-// (10/08/16)
-// ADD DESCRIPTION!
-
+// (08/09/16)
+// Class for modifying stop arrivals data (e.g. removing negative link
+// times) prior to running of link times processes.
 
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
@@ -129,8 +129,10 @@ class ProcessArrivals {
   // batch database 
   private function insert_best_results($selected_rows) {
     echo "Inserting correct rows...";
-    $sql = "INSERT INTO $this->arrival_table (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
-          ."VALUES (:stopid, :visitnumber, :destinationtext, :vehicleid, :estimatedtime, :expiretime, :recordtime, :uniqueid)";
+    $sql = "INSERT INTO $this->arrival_table(stopid,visitnumber,destinationtext,"
+    	  ."vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
+          ."VALUES (:stopid, :visitnumber, :destinationtext, :vehicleid, "
+	  .":estimatedtime, :expiretime, :recordtime, :uniqueid)";
 
     $insert_rows = $this->DBH->prepare($sql);
 
@@ -152,7 +154,9 @@ class ProcessArrivals {
   private function make_backup($start_time, $end_time) {
     echo "Copying data to backup database...";
 
-    $sql = "INSERT INTO $this->arrival_table_backup (stopid,visitnumber,destinationtext,vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
+    $sql = "INSERT INTO $this->arrival_table_backup"
+    	  ."(stopid,visitnumber,destinationtext,"
+	  ."vehicleid,estimatedtime,expiretime,recordtime,uniqueid) "
           ."SELECT * "
 	  ."FROM $this->arrival_table "
 	  ."WHERE estimatedtime BETWEEN $start_time AND $end_time";
@@ -167,7 +171,8 @@ class ProcessArrivals {
     $sql = "DELETE FROM $this->arrival_table "
     	  ."WHERE (uniqueid, stopid) IN "
 	  ."(SELECT uniqueid, destination.stopid AS end "
-	  ."FROM $this->arrival_table AS source JOIN $this->arrival_table AS destination USING(uniqueid), "
+	  ."FROM $this->arrival_table AS source "
+	  ."JOIN $this->arrival_table AS destination USING(uniqueid), "
 	  ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
 	  ."FROM ($this->route_table NATURAL JOIN $this->stop_table) AS a JOIN "
 	  ."($this->route_table NATURAL JOIN $this->stop_table) AS b "

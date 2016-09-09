@@ -1,5 +1,5 @@
 <?php
-//345678901234567890123456789012345678901234567890123456789012345678901234567890
+
 // StopReferenceUpdateClass.php
 // Anthony Miles Flynn
 // (29/07/16)
@@ -7,10 +7,10 @@
 // reference data has been updated.  If so, the relevant table in the database
 // is updated with the most recent data.
 
-include_once '/data/individual_project/php/modules/stream_wrappers/'
-	    .'StopReferenceStreamWrapperClass.php';
-include_once '/data/individual_project/php/modules/DatabaseClass.php';
-include_once '/data/individual_project/php/modules/HttpClientClass.php';
+include_once ('/data/individual_project/php/modules/stream_wrappers/'
+	     .'StopReferenceStreamWrapperClass.php');
+include_once ('/data/individual_project/php/modules/DatabaseClass.php');
+include_once ('/data/individual_project/php/modules/HttpClientClass.php');
 
 class StopReferenceUpdate {
   private $previous_version;
@@ -28,7 +28,7 @@ class StopReferenceUpdate {
   public function __construct($temporary_database = "stop_reference_temp",
 			      $permanent_database = "stop_reference",
 			      $version_file = "/data/individual_project/php/"
-			      		     ."stop_reference/version.txt") {
+			      		     ."reference_update/version.txt") {
     $this->version_file = $version_file;
     $this->previous_version = $this->get_previous_version();
     $this->baseversion_array = $this->get_baseversion_array();

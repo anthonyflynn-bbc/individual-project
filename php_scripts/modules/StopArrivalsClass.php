@@ -7,7 +7,7 @@
 // received.  For each uniqueid and stopid, extracts the entry with the most
 // recent record time as representing the arrival time of the bus at that stop.
 
-include '/data/individual_project/php/modules/DatabaseClass.php';
+include_once ('/data/individual_project/php/modules/DatabaseClass.php');
 
 class StopArrivals { 
   private $start_time_unix; // start of batch process (unix time)

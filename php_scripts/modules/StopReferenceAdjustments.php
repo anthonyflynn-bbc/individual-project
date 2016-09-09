@@ -3,7 +3,7 @@
 // StopReferenceAdjustments.php
 // Anthony Miles Flynn
 // (12/08/16)
-// Correct incorrect stop reference reference
+// Class to correct incorrect stop reference reference
 
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
@@ -200,7 +200,7 @@ class Corrections {
       $update_sql->execute();
     }
 
-    // ADJUSTMENTS WHERE DUPLICATE STOPCODE2 FOR 2 DIFFERENT STOPIDS:
+    // Adjustments where duplicate stopcode2 for 2 different stopids:
     $duplicate_array = array("BP437", "17909", "34804", "35427", "BP437",
 		             "BP4575", "BP5746", "H0204", "H0205", "H0429");
 

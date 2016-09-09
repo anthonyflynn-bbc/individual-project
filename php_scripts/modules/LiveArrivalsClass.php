@@ -1,29 +1,40 @@
 <?php
 
+// LiveArrivalsClass.php
+// Anthony Miles Flynn
+// (08/09/16)
+// Class for extracting live arrival estimates from stop predictions table and
+// saving into current output JSON files directory on a per route basis.
+
 include_once '/data/individual_project/php/modules/DatabaseClass.php';
 
 class LiveArrivals {
   private $database;
   private $DBH;
-  private $wait_period; // time with no more predictions before assumed arrival
-  private $arrivals_cache; // time to hold arrivals data before deleting from array
+  private $wait_period; // time before predictions are assumed arrivals
+  private $arrivals_cache; // time to hold arrivals before deleting from array
   private $stop_predictions = array(); // key = uniqueid + stopid + visitnumber
-  private $stop_arrivals = array(); // key = stopid. Element: linename=>(uniqueid => arrival time)
-  private $link_times = array(); // holds linktimes between stopids.
-  private $route_sequence; // key = linename, elements = (directionid=>array of stopids)
+  private $stop_arrivals = array(); // key = stopid. Element: linename=>
+  	  		   	    //(uniqueid => arrival time)
+  private $link_times = array();    // holds linktimes between stopids.
+  private $route_sequence;          // key = linename, elements = (directionid=>
+  	  		      	    //array of stopids)
   private $last_update_time_unix;
-  private $json_save_directory = "/data/individual_project/api/route_api/data/current/"; 
+  private $json_save_directory = "/data/individual_project/api/route_api/"
+  	  		       	."data/current/"; 
+  private $max_records_per_stop = 100;
 
   // Constructor
-  public function __construct($wait_period=300, $arrivals_cache=3600, $save_folder="") {
+  public function __construct($wait_period=300, $arrivals_cache=3600, 
+  	 	  	      $save_folder="") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
     $this->wait_period = $wait_period; // default 5 mintues
     $this->arrivals_cache = $arrivals_cache; // default 1 hour
-    $this->last_update_time_unix = time() - 3600; // initially loads 1 hour of historic predictions
+    $this->last_update_time_unix = time() - 3600; // 1 hour loaded at start
     $this->route_sequence = $this->load_parse_json("tfl.doc.ic.ac.uk/routes/"
 						   ."route_reference.json");
-    $this->json_save_directory .= $save_folder; // appends save folder to directory
+    $this->json_save_directory .= $save_folder; //appends save folder to directory
   }
 
   // Function cycles through latest stop predictions and looks for arrivals
@@ -31,8 +42,10 @@ class LiveArrivals {
     while(true) {
       $start_update_time_unix = $this->last_update_time_unix;
       $this->last_update_time_unix = time();
-      $start_time = $this->DBH->quote(date('Y-m-d H:i:s', $start_update_time_unix));  // get unix times in database format
-      $end_time = $this->DBH->quote(date('Y-m-d H:i:s', $this->last_update_time_unix)); // get unix times in database format
+      $start_time = $this->DBH->quote(date('Y-m-d H:i:s', 
+      		    		$start_update_time_unix));  //format unix time
+      $end_time = $this->DBH->quote(date('Y-m-d H:i:s', 
+      		  		$this->last_update_time_unix));
 
       $predictions = $this->get_stop_predictions($start_time, $end_time);
       $this->extract_latest_stop_predictions($predictions);
@@ -47,10 +60,11 @@ class LiveArrivals {
     }
   }
 
-  // Function retrieves recent stop predictions, returns array of prediction data
+  // Function retrieves recent stop predictions, returns array of predictions
   private function get_stop_predictions($start_time, $end_time) {
     echo "Querying database for latest stop predictions...";
-    $sql = "SELECT stopid, visitnumber, estimatedtime, recordtime, uniqueid, linename "
+    $sql = "SELECT stopid, visitnumber, estimatedtime, recordtime, "
+    	  ."uniqueid, linename "
     	  ."FROM stop_prediction_all "
 	  ."JOIN journey_identifier_all USING (uniqueid) "
 	  ."WHERE recordtime BETWEEN $start_time AND $end_time ";
@@ -74,7 +88,8 @@ class LiveArrivals {
 
       if(!array_key_exists($key, $this->stop_predictions)) {
         $this->stop_predictions[$key] = $details;
-      } elseif($entry['recordtime'] > $this->stop_predictions[$key]['recordtime']) {
+      } elseif($entry['recordtime'] > 
+      			$this->stop_predictions[$key]['recordtime']) {
         unset($this->stop_predictions[$key]);
 	$this->stop_predictions[$key] = $details;
       }
@@ -87,21 +102,30 @@ class LiveArrivals {
   // predictions made by TfL
   private function extract_stop_arrivals() {
     echo "Extracting stop arrivals...";
-    $last_update_time = $this->DBH->quote(date('Y-m-d H:i:s', $this->last_update_time_unix));
+    $last_update_time = $this->DBH->quote(date('Y-m-d H:i:s', 
+    		      			       $this->last_update_time_unix));
 
     foreach($this->stop_predictions as $key=>$value) {
-      if(($this->last_update_time_unix - strtotime($value['recordtime'])) > $this->wait_period
-           && strtotime($value['estimatedtime']) < $this->last_update_time_unix) { // i.e. this is an arrival
+      if(($this->last_update_time_unix - strtotime($value['recordtime'])) > 
+      				       	 	   $this->wait_period
+           && strtotime($value['estimatedtime']) < 
+	      		$this->last_update_time_unix) { // i.e. =arrival
 
-        $uniqueid_arrival = array($value['uniqueid']=>strtotime($value['estimatedtime']));
+        $uniqueid_arrival = array($value['uniqueid']=>
+					strtotime($value['estimatedtime']));
 
-	if(!array_key_exists($value['stopid'], $this->stop_arrivals)) { // no records for this stopid
-	  $this->stop_arrivals[$value['stopid']] = array($value['linename']=>$uniqueid_arrival);
-	} else {
-	  if(!array_key_exists($value['linename'], $this->stop_arrivals[$value['stopid']])) { // records for stopid, but none for this linename
-	    $this->stop_arrivals[$value['stopid']][$value['linename']] = $uniqueid_arrival;
+	// if no records for stopid:
+	if(!array_key_exists($value['stopid'], $this->stop_arrivals)) { 
+	  $this->stop_arrivals[$value['stopid']] = 
+	  		       array($value['linename']=>$uniqueid_arrival);
+	} else { // records for stopid, but none for this linename
+	  if(!array_key_exists($value['linename'], 
+			       $this->stop_arrivals[$value['stopid']])) { 
+	    $this->stop_arrivals[$value['stopid']][$value['linename']] = 
+	    			 $uniqueid_arrival;
 	  } else { // records exist for this stopid and linename
-	    if(array_key_exists($value['uniqueid'], $this->stop_arrivals[$value['stopid']][$value['linename']])) {
+	    if(array_key_exists($value['uniqueid'], 
+	    	 $this->stop_arrivals[$value['stopid']][$value['linename']])) {
 	      unset($this->stop_arrivals[$value['stopid']][$value['linename']][$value['uniqueid']]);
 	    }
 	    $this->stop_arrivals[$value['stopid']][$value['linename']] += $uniqueid_arrival;
@@ -192,7 +216,7 @@ class LiveArrivals {
   private function delete_stale_linktimes() {
     foreach($this->link_times as $linkid=>$arrival_time_array) {
       foreach($arrival_time_array as $arrival_time=>$uniqueid_array) {
-        if(($this->last_update_time_unix - $arrival_time) > 2 * 3600) { // delete link times that are > 2 hours old
+        if(($this->last_update_time_unix - $arrival_time) > 2 * $this->arrivals_cache) { 
 	  unset($this->link_times[$linkid][$arrival_time]);	  
 	}
       }
@@ -201,8 +225,7 @@ class LiveArrivals {
 
   // Function cycles through all routes (in both directions), extracts ordered 
   // sequence of linkids, extracts the latest information from the link_times 
-  // array and generates a JSON file with a summary.  The JSON contains up the 
-  // most recent 100 link times, along with the associated uniqueid
+  // array and generates a JSON file with a summary.
   private function create_json_files() {
     foreach($this->route_sequence as $linename=>$direction) {
       $route_times = array();
@@ -213,11 +236,12 @@ class LiveArrivals {
 	  if(array_key_exists($linkid, $this->link_times)) {
 	    foreach($this->link_times[$linkid] as $arrival_time=>$uniqueid_linktime) {
 
-	      $save_format = array(key($uniqueid_linktime)=>array($arrival_time, $uniqueid_linktime[key($uniqueid_linktime)]));
+	      $save_format = array(key($uniqueid_linktime)=>array($arrival_time, 
+	      		     	       $uniqueid_linktime[key($uniqueid_linktime)]));
 
 	      $times += $save_format;
 	      
-	      if(count($times) >= 100) {
+	      if(count($times) >= $this->max_records_per_stop) {
 	        break;
 	      }
 	    }

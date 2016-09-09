@@ -55,27 +55,27 @@ class LinkTimesDate {
 
   // Function calculates the average journey time between each pair of stops 
   // which are adjacent to each other on one or more bus routes
-  private function extract_journey_times($start_time, $end_time) {
+  public function extract_journey_times($start_time, $end_time) {
     echo "Extracting average times between links...";
 
     $sql = "SELECT source.stopid AS start, destination.stopid AS end, "
-    	  ."ROUND(AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime," 
-	  		             ."source.estimatedtime)))) AS average_time "
-	  ."FROM $this->arrival_table AS source "
-	  ."JOIN "
-	  ."$this->arrival_table AS destination "
-	  ."USING(uniqueid), "
-	  ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
-	  ."FROM ($this->route_table NATURAL JOIN $this->stop_table) AS a, "
-	  ."($this->route_table NATURAL JOIN $this->stop_table) AS b "
-	  ."WHERE a.linename = b.linename "
-	  ."AND a.directionid = b.directionid "
-	  ."AND (b.stopnumber - a.stopnumber) = 1) as connected_stops "
-	  ."WHERE source.estimatedtime BETWEEN $start_time AND $end_time "
-	  ."AND destination.estimatedtime BETWEEN $start_time AND $end_time "
-	  ."AND x = source.stopid "
-	  ."AND y = destination.stopid "
-	  ."GROUP BY source.stopid, destination.stopid";
+    	   ."ROUND(AVG(EXTRACT(EPOCH FROM AGE(destination.estimatedtime," 
+	   ."source.estimatedtime)))) AS average_time "
+	   ."FROM $this->arrival_table AS source "
+	   ."JOIN "
+	   ."$this->arrival_table AS destination "
+	   ."USING(uniqueid), "
+	   ."(SELECT DISTINCT a.stopid as x, b.stopid as y "
+	   ."FROM ($this->route_table NATURAL JOIN $this->stop_table) AS a, "
+	   ."($this->route_table NATURAL JOIN $this->stop_table) AS b "
+	   ."WHERE a.linename = b.linename "
+	   ."AND a.directionid = b.directionid "
+	   ."AND (b.stopnumber - a.stopnumber) = 1) as connected_stops "
+	   ."WHERE source.estimatedtime BETWEEN $start_time AND $end_time "
+	   ."AND destination.estimatedtime BETWEEN $start_time AND $end_time "
+	   ."AND x = source.stopid "
+	   ."AND y = destination.stopid "
+	   ."GROUP BY source.stopid, destination.stopid";
 
     return $this->database->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
   }
@@ -118,6 +118,5 @@ class LinkTimesDate {
     echo "Complete\n";
   }
 }
-
 
 ?>

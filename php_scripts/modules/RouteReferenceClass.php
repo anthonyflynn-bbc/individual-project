@@ -151,12 +151,13 @@ class RouteReference {
   // Function downloads the data from the API, saves to a file and returns the
   // data as an array
   private function download_json($api_url) {
-    $fp = fopen("route_reference_data.txt","w+");
+    $file_location = "/data/individual_project/php/reference_update/route_reference_data.txt";
+    $fp = fopen($file_location,"w+");
 
     $Http = new HttpClient($api_url, $fp);
     $Http->start_data_collection();
     $Http->close_connection();
-    $downloaded_data = file_get_contents("route_reference_data.txt");
+    $downloaded_data = file_get_contents($file_location);
     fclose($fp); // close file handler
     return json_decode($downloaded_data, true);
   }

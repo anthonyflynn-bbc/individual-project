@@ -106,8 +106,6 @@ class RouteReferenceJSONUpdate {
     return $linktimes;
   }
 
-
-
   // Function saves the data in $array, encoded into JSON format, to a file
   // located at $save_location
   private function save_json($json_filename, $array) {
