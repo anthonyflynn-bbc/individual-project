@@ -5,10 +5,10 @@
 // (29/07/16)
 // Public versions of StopReferenceUpdateClass - used for unit testing
 
-include_once '/data/individual_project/php/test_files/php_unit/StopReference/'
-	    .'StopReferenceStreamWrapperClassTest.php';
-include_once '/data/individual_project/php/modules/DatabaseClass.php';
-include_once '/data/individual_project/php/modules/HttpClientClass.php';
+include_once ('/data/individual_project/php/test_files/php_unit/StopReference/'
+	    .'StopReferenceStreamWrapperClassTest.php');
+include_once ('/data/individual_project/php/modules/DatabaseClass.php');
+include_once ('/data/individual_project/php/modules/HttpClientClass.php');
 
 class StopReferenceFunctions {
   public $previous_version;

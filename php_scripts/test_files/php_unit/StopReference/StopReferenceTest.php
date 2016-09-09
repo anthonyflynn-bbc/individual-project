@@ -1,5 +1,10 @@
 <?php
 
+// StopReferenceTest.php
+// Anthony Miles Flynn
+// (08/09/16)
+// PHPUnit test file for StopReferenceWrapper class
+
 use phpunit\framework\TestCase;
 require_once('StopReferenceUpdateFunctions.php'); //public function versions
 

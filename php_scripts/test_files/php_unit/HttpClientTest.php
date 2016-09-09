@@ -1,5 +1,10 @@
 <?php
 
+// HttpClientTest.php
+// Anthony Miles Flynn
+// (08/09/16)
+// PHPUnit test file for HttpClient class
+
 use phpunit\framework\TestCase;
 require_once('/data/individual_project/php/modules/HttpClientClass.php');
 

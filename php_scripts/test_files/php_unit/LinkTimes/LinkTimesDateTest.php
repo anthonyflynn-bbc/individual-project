@@ -3,7 +3,7 @@
 // LinkTimesDateTest.php
 // Anthony Miles Flynn
 // (30/07/16)
-// Program completes unit tests on LinkTimesDateClass.php
+// PHPUnit test file for LinkTimesDate class
 
 use phpunit\framework\TestCase;
 require_once('/data/individual_project/php/test_files/php_unit/LinkTimes/'
