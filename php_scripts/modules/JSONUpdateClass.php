@@ -14,13 +14,22 @@ class JSONUpdate {
   private $database;
   private $DBH;
   private $save_directory;
+  private $stop_table;
+  private $route_table;
+  private $link_times_day_table;
 
   // Constructor
   public function __construct($save_directory = "/data/individual_project/api"
-  	 	  			       ."/route_api/data/historic/") {
+  	 	  			       ."/route_api/data/historic/",
+			      $stop_table = "stop_reference",
+			      $route_table = "route_reference",
+			      $link_times_day_table = "link_times_average") {
     $this->database = new Database();
     $this->DBH = $this->database->get_connection();
     $this->save_directory = $save_directory;
+    $this->stop_table = $stop_table;
+    $this->route_table = $route_table;
+    $this->link_times_day_table = $link_times_day_table;
   }
 
   // Function extracts an array of all bus routes, then generates the JSON file 
@@ -74,7 +83,7 @@ class JSONUpdate {
   // TfL network
   private function get_bus_routes() {
     $sql = "SELECT DISTINCT linename "
-    	  ."FROM route_reference";
+    	  ."FROM $this->route_table";
 
     return $this->database->execute_sql($sql)->fetchAll(PDO::FETCH_ASSOC);
   }
@@ -83,10 +92,10 @@ class JSONUpdate {
   // bus route based on a particular day (both provided as parameters)
   private function get_line_times($route, $day) {
     $sql = "SELECT x.stopid AS start, y.stopid AS end, hour, link_time "
-          ."FROM (SELECT * FROM route_reference NATURAL JOIN stop_reference) AS x "
-          ."JOIN (SELECT * FROM route_reference NATURAL JOIN stop_reference) AS y "
+          ."FROM (SELECT * FROM $this->route_table NATURAL JOIN $this->stop_table) AS x "
+          ."JOIN (SELECT * FROM $this->route_table NATURAL JOIN $this->stop_table) AS y "
 	  ."USING (linename, directionid) "
-      	  ."JOIN link_times_average "
+      	  ."JOIN $this->link_times_day_table "
 	  ."ON x.stopid = start_stopid AND y.stopid = end_stopid "
       	  ."WHERE x.linename='".$route."' "
       	  ."AND y.stopnumber - x.stopnumber = 1 "
