@@ -1,5 +1,11 @@
 <?php
 
+// StopPredictionStreamWrapperClass.php
+// Anthony Miles Flynn
+// (08/09/16)
+// Class to extract data from the TfL API, parse it and insert it into 
+// the stop prediction relation 
+
 class tflStreamWrapper {
   protected $buff; // buffer to store partial lines during parsing
   protected $database;
@@ -116,6 +122,7 @@ class tflStreamWrapper {
 		       	 'expiretime'=>($this->DBH->quote(date('Y-m-d H:i:s',$entry[10]/1000))),
 		       	 'recordtime'=>$current_time,
 		       	 'uniqueid'=>$entry_uniqueid);
+
 
 	if(!array_key_exists($stop_array_key,$batch_stop_array)) {
 	  $batch_stop_array[$stop_array_key] = $details;
